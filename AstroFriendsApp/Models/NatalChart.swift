@@ -60,15 +60,21 @@ struct NatalChart {
         // Get the reference sign index
         let referenceIndex = ZodiacSign.allCases.firstIndex(of: referenceMoonSign) ?? 0
         
-        // Calculate current moon sign index
-        let moonIndex = (referenceIndex + signsMoved) % 12
+        // Calculate current moon sign index - handle negative values safely
+        var moonIndex = (referenceIndex + signsMoved) % 12
+        if moonIndex < 0 {
+            moonIndex += 12
+        }
         
         // Adjust if we have birth time for more precision
         if let time = birthTime {
             let hour = calendar.component(.hour, from: time)
             // Moon moves ~0.5 degrees per hour, so 12 hours = ~half a sign
             let hourAdjustment = hour >= 12 ? 1 : 0
-            let adjustedIndex = (moonIndex + hourAdjustment) % 12
+            var adjustedIndex = (moonIndex + hourAdjustment) % 12
+            if adjustedIndex < 0 {
+                adjustedIndex += 12
+            }
             return ZodiacSign.allCases[adjustedIndex]
         }
         
@@ -120,8 +126,11 @@ struct NatalChart {
         let hoursFromSunrise = adjustedHour - 6.0
         let signsOffset = Int(hoursFromSunrise / 2.0)
         
-        // Rising sign index
-        let risingIndex = (sunSignIndex + signsOffset + 12) % 12
+        // Rising sign index - handle negative values safely
+        var risingIndex = (sunSignIndex + signsOffset) % 12
+        while risingIndex < 0 {
+            risingIndex += 12
+        }
         
         return ZodiacSign.allCases[risingIndex]
     }

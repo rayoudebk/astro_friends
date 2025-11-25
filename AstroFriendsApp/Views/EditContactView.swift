@@ -22,6 +22,16 @@ struct EditContactView: View {
     
     let frequencyOptions = [7, 14, 30, 60, 90, 180, 365]
     
+    // Computed natal chart preview (safer than inline)
+    private var previewChart: NatalChart? {
+        guard hasBirthday else { return nil }
+        return NatalChart(
+            birthDate: birthday,
+            birthTime: hasBirthTime ? birthTime : nil,
+            birthPlace: birthPlace.isEmpty ? nil : birthPlace
+        )
+    }
+    
     var body: some View {
         NavigationStack {
             Form {
@@ -60,14 +70,8 @@ struct EditContactView: View {
                 }
                 
                 // Natal Chart Preview
-                if hasBirthday {
+                if let chart = previewChart {
                     Section("Natal Chart") {
-                        let chart = NatalChart(
-                            birthDate: birthday,
-                            birthTime: hasBirthTime ? birthTime : nil,
-                            birthPlace: birthPlace.isEmpty ? nil : birthPlace
-                        )
-                        
                         HStack {
                             Label("Sun", systemImage: "sun.max.fill")
                                 .foregroundColor(.orange)
