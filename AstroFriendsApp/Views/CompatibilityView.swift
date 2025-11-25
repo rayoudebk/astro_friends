@@ -5,10 +5,33 @@ struct CompatibilityView: View {
     let contact: Contact
     @State private var userSign: ZodiacSign = .aries
     @AppStorage("userZodiacSign") private var savedUserSign: String = "Aries"
+    @AppStorage("userBirthday") private var userBirthdayTimestamp: Double = 0
+    @AppStorage("userBirthTime") private var userBirthTimeTimestamp: Double = 0
+    @AppStorage("userBirthPlace") private var userBirthPlace: String = ""
+    @State private var showingUserBirthSettings = false
     @Environment(\.dismiss) private var dismiss
     
+    // User's natal chart
+    var userNatalChart: NatalChart? {
+        guard userBirthdayTimestamp > 0 else { return nil }
+        let birthday = Date(timeIntervalSince1970: userBirthdayTimestamp)
+        let birthTime = userBirthTimeTimestamp > 0 ? Date(timeIntervalSince1970: userBirthTimeTimestamp) : nil
+        let birthPlace = userBirthPlace.isEmpty ? nil : userBirthPlace
+        return NatalChart(birthDate: birthday, birthTime: birthTime, birthPlace: birthPlace)
+    }
+    
+    // Contact's natal chart
+    var contactNatalChart: NatalChart? {
+        contact.natalChart
+    }
+    
     var compatibility: AstralCompatibility {
-        AstralCompatibility(person1Sign: userSign, person2Sign: contact.zodiacSign)
+        AstralCompatibility(
+            person1Chart: userNatalChart,
+            person2Chart: contactNatalChart,
+            person1SunFallback: userSign,
+            person2SunFallback: contact.zodiacSign
+        )
     }
     
     var body: some View {
@@ -18,14 +41,27 @@ struct CompatibilityView: View {
                     // Header with both signs
                     headerView
                     
+                    // Chart completeness indicator
+                    chartCompletenessView
+                    
                     // Harmony Score
                     harmonyScoreView
                     
                     // Poetic Summary
                     poeticSummaryView
                     
-                    // Oracle Reading
+                    // Oracle Reading (Sun Sign)
                     oracleReadingView
+                    
+                    // Moon Compatibility (if available)
+                    if compatibility.hasDeepCompatibility {
+                        moonCompatibilityView
+                    }
+                    
+                    // Rising Compatibility (if available)
+                    if compatibility.hasRisingData {
+                        risingCompatibilityView
+                    }
                     
                     // Elemental & Modality Dynamic
                     dynamicsView
@@ -65,8 +101,216 @@ struct CompatibilityView: View {
                     userSign = sign
                 }
             }
+            .sheet(isPresented: $showingUserBirthSettings) {
+                UserBirthDataView(
+                    userSign: $userSign,
+                    savedUserSign: $savedUserSign,
+                    userBirthdayTimestamp: $userBirthdayTimestamp,
+                    userBirthTimeTimestamp: $userBirthTimeTimestamp,
+                    userBirthPlace: $userBirthPlace
+                )
+            }
         }
         .preferredColorScheme(.dark)
+    }
+    
+    // MARK: - Chart Completeness View
+    private var chartCompletenessView: some View {
+        VStack(spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text("Your Chart")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text(userNatalChart?.chartCompleteness.emoji ?? "☀️")
+                            .font(.caption)
+                    }
+                    if userNatalChart == nil {
+                        Text("Sun sign only")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    } else {
+                        Text(userNatalChart!.chartCompleteness.description)
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                }
+                
+                Spacer()
+                
+                Button {
+                    showingUserBirthSettings = true
+                } label: {
+                    Text("Edit")
+                        .font(.caption)
+                        .foregroundColor(.cyan)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 4) {
+                    HStack {
+                        Text(contactNatalChart?.chartCompleteness.emoji ?? "☀️")
+                            .font(.caption)
+                        Text("\(contact.name.components(separatedBy: " ").first ?? contact.name)'s Chart")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    if contactNatalChart == nil {
+                        Text("Sun sign only")
+                            .font(.caption2)
+                            .foregroundColor(.orange)
+                    } else {
+                        Text(contactNatalChart!.chartCompleteness.description)
+                            .font(.caption2)
+                            .foregroundColor(.green)
+                    }
+                }
+            }
+            
+            if !compatibility.hasDeepCompatibility {
+                Text("💡 Add birth dates, times & places for deeper Moon & Rising compatibility")
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.5))
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+    }
+    
+    // MARK: - Moon Compatibility View
+    private var moonCompatibilityView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("Emotional Bond", systemImage: "moon.fill")
+                    .font(.headline)
+                    .foregroundColor(.indigo)
+                
+                Spacer()
+                
+                if let level = compatibility.moonHarmonyLevel {
+                    Text(level.emoji)
+                        .font(.caption)
+                }
+            }
+            
+            // Moon signs display
+            if let moon1 = compatibility.person1Moon, let moon2 = compatibility.person2Moon {
+                HStack {
+                    VStack {
+                        Text("Your Moon")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("\(moon1.emoji) \(moon1.rawValue)")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "heart.fill")
+                        .foregroundColor(.indigo.opacity(0.5))
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text("Their Moon")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("\(moon2.emoji) \(moon2.rawValue)")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            
+            if let reading = compatibility.moonCompatibility {
+                Text(reading)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineSpacing(4)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.indigo.opacity(0.2), Color.purple.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(16)
+    }
+    
+    // MARK: - Rising Compatibility View
+    private var risingCompatibilityView: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label("First Impressions", systemImage: "arrow.up.circle.fill")
+                    .font(.headline)
+                    .foregroundColor(.purple)
+                
+                Spacer()
+                
+                if let level = compatibility.risingHarmonyLevel {
+                    Text(level.emoji)
+                        .font(.caption)
+                }
+            }
+            
+            // Rising signs display
+            if let rising1 = compatibility.person1Rising, let rising2 = compatibility.person2Rising {
+                HStack {
+                    VStack {
+                        Text("Your Rising")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("\(rising1.emoji) \(rising1.rawValue)")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
+                    
+                    Spacer()
+                    
+                    Image(systemName: "sparkles")
+                        .foregroundColor(.purple.opacity(0.5))
+                    
+                    Spacer()
+                    
+                    VStack {
+                        Text("Their Rising")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("\(rising2.emoji) \(rising2.rawValue)")
+                            .font(.caption)
+                            .foregroundColor(.white)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            
+            if let reading = compatibility.risingCompatibility {
+                Text(reading)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineSpacing(4)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.2), Color.pink.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(16)
     }
     
     // MARK: - Header View
@@ -493,6 +737,152 @@ struct CompatibilityBadge: View {
         case .growthPartners: return .green
         case .dynamicTension: return .orange
         }
+    }
+}
+
+// MARK: - User Birth Data View
+struct UserBirthDataView: View {
+    @Binding var userSign: ZodiacSign
+    @Binding var savedUserSign: String
+    @Binding var userBirthdayTimestamp: Double
+    @Binding var userBirthTimeTimestamp: Double
+    @Binding var userBirthPlace: String
+    
+    @State private var hasBirthday: Bool = false
+    @State private var birthday: Date = Date()
+    @State private var hasBirthTime: Bool = false
+    @State private var birthTime: Date = Date()
+    @State private var birthPlace: String = ""
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Sun Sign", selection: $userSign) {
+                        ForEach(ZodiacSign.allCases, id: \.self) { sign in
+                            HStack {
+                                Text(sign.emoji)
+                                Text(sign.rawValue)
+                            }
+                            .tag(sign)
+                        }
+                    }
+                } header: {
+                    Text("Your Zodiac Sign")
+                }
+                
+                Section {
+                    Toggle("I know my birthday", isOn: $hasBirthday)
+                    
+                    if hasBirthday {
+                        DatePicker("Birthday", selection: $birthday, displayedComponents: .date)
+                            .onChange(of: birthday) { _, newDate in
+                                userSign = ZodiacSign.from(birthday: newDate)
+                            }
+                    }
+                    
+                    Toggle("I know my birth time", isOn: $hasBirthTime)
+                    
+                    if hasBirthTime {
+                        DatePicker("Birth Time", selection: $birthTime, displayedComponents: .hourAndMinute)
+                    }
+                    
+                    TextField("Birth Place (City, Country)", text: $birthPlace)
+                } header: {
+                    Text("Birth Data for Full Chart")
+                } footer: {
+                    Text("Adding your birth time and place enables Moon and Rising sign compatibility for deeper readings.")
+                }
+                
+                // Preview natal chart
+                if hasBirthday {
+                    Section("Your Natal Chart Preview") {
+                        let chart = NatalChart(
+                            birthDate: birthday,
+                            birthTime: hasBirthTime ? birthTime : nil,
+                            birthPlace: birthPlace.isEmpty ? nil : birthPlace
+                        )
+                        
+                        HStack {
+                            Label("Sun", systemImage: "sun.max.fill")
+                                .foregroundColor(.orange)
+                            Spacer()
+                            Text("\(chart.sunSign.emoji) \(chart.sunSign.rawValue)")
+                        }
+                        
+                        HStack {
+                            Label("Moon", systemImage: "moon.fill")
+                                .foregroundColor(.indigo)
+                            Spacer()
+                            Text("\(chart.moonSign.emoji) \(chart.moonSign.rawValue)")
+                            if !hasBirthTime {
+                                Text("(approx)")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        
+                        if let rising = chart.risingSign {
+                            HStack {
+                                Label("Rising", systemImage: "arrow.up.circle.fill")
+                                    .foregroundColor(.purple)
+                                Spacer()
+                                Text("\(rising.emoji) \(rising.rawValue)")
+                            }
+                        } else {
+                            HStack {
+                                Label("Rising", systemImage: "arrow.up.circle")
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                Text("Add birth time & place")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Your Birth Data")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveData()
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                loadData()
+            }
+        }
+    }
+    
+    private func loadData() {
+        if userBirthdayTimestamp > 0 {
+            hasBirthday = true
+            birthday = Date(timeIntervalSince1970: userBirthdayTimestamp)
+        }
+        if userBirthTimeTimestamp > 0 {
+            hasBirthTime = true
+            birthTime = Date(timeIntervalSince1970: userBirthTimeTimestamp)
+        }
+        birthPlace = userBirthPlace
+    }
+    
+    private func saveData() {
+        savedUserSign = userSign.rawValue
+        userBirthdayTimestamp = hasBirthday ? birthday.timeIntervalSince1970 : 0
+        userBirthTimeTimestamp = hasBirthTime ? birthTime.timeIntervalSince1970 : 0
+        userBirthPlace = birthPlace
     }
 }
 

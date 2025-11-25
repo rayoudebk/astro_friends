@@ -19,6 +19,8 @@ final class Contact {
     var giftIdea: String // Next gift idea
     var photosPersonLocalIdentifier: String? // Link to Photos app person
     var birthday: Date? // Birthday from contacts
+    var birthTime: Date? // Time of birth (hour/minute)
+    var birthPlace: String? // City/Country of birth
     var profileImageData: Data? // Profile image from contacts
     var contactIdentifier: String? // Original CNContact identifier
     var weMet: String // "We met..." text
@@ -40,6 +42,8 @@ final class Contact {
         giftIdea: String = "",
         photosPersonLocalIdentifier: String? = nil,
         birthday: Date? = nil,
+        birthTime: Date? = nil,
+        birthPlace: String? = nil,
         profileImageData: Data? = nil,
         contactIdentifier: String? = nil,
         weMet: String = ""
@@ -58,6 +62,8 @@ final class Contact {
         self.giftIdea = giftIdea
         self.photosPersonLocalIdentifier = photosPersonLocalIdentifier
         self.birthday = birthday
+        self.birthTime = birthTime
+        self.birthPlace = birthPlace
         self.profileImageData = profileImageData
         self.contactIdentifier = contactIdentifier
         self.weMet = weMet

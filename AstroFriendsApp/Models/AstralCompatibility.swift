@@ -7,10 +7,55 @@ struct AstralCompatibility {
     let person1Sign: ZodiacSign
     let person2Sign: ZodiacSign
     
+    // Optional natal chart data for deeper compatibility
+    var person1Moon: ZodiacSign?
+    var person1Rising: ZodiacSign?
+    var person2Moon: ZodiacSign?
+    var person2Rising: ZodiacSign?
+    
+    // Initialize with just sun signs (basic compatibility)
+    init(person1Sign: ZodiacSign, person2Sign: ZodiacSign) {
+        self.person1Sign = person1Sign
+        self.person2Sign = person2Sign
+    }
+    
+    // Initialize with full natal charts (deep compatibility)
+    init(person1Chart: NatalChart?, person2Chart: NatalChart?, person1SunFallback: ZodiacSign, person2SunFallback: ZodiacSign) {
+        self.person1Sign = person1Chart?.sunSign ?? person1SunFallback
+        self.person2Sign = person2Chart?.sunSign ?? person2SunFallback
+        self.person1Moon = person1Chart?.moonSign
+        self.person1Rising = person1Chart?.risingSign
+        self.person2Moon = person2Chart?.moonSign
+        self.person2Rising = person2Chart?.risingSign
+    }
+    
+    // Check if we have deep chart data
+    var hasDeepCompatibility: Bool {
+        person1Moon != nil || person2Moon != nil
+    }
+    
+    var hasRisingData: Bool {
+        person1Rising != nil || person2Rising != nil
+    }
+    
     // MARK: - Computed Properties
     
     var harmonyScore: Int {
-        Self.calculateHarmonyScore(between: person1Sign, and: person2Sign)
+        var score = Self.calculateHarmonyScore(between: person1Sign, and: person2Sign)
+        
+        // Add Moon compatibility bonus (emotional connection)
+        if let moon1 = person1Moon, let moon2 = person2Moon {
+            let moonScore = Self.calculateHarmonyScore(between: moon1, and: moon2)
+            score = (score * 2 + moonScore) / 3 // Weight sun more than moon
+        }
+        
+        // Add Rising compatibility bonus (first impressions & lifestyle)
+        if let rising1 = person1Rising, let rising2 = person2Rising {
+            let risingScore = Self.calculateHarmonyScore(between: rising1, and: rising2)
+            score = (score * 3 + risingScore) / 4 // Weight existing more than rising
+        }
+        
+        return min(100, max(0, score))
     }
     
     var harmonyLevel: HarmonyLevel {
@@ -23,6 +68,32 @@ struct AstralCompatibility {
     
     var modalityDynamic: ModalityDynamic {
         ModalityDynamic.between(person1Sign.modality, and: person2Sign.modality)
+    }
+    
+    // MARK: - Moon Compatibility (Emotional Bond)
+    
+    var moonCompatibility: String? {
+        guard let moon1 = person1Moon, let moon2 = person2Moon else { return nil }
+        return Self.getMoonCompatibilityReading(moon1: moon1, moon2: moon2)
+    }
+    
+    var moonHarmonyLevel: HarmonyLevel? {
+        guard let moon1 = person1Moon, let moon2 = person2Moon else { return nil }
+        let score = Self.calculateHarmonyScore(between: moon1, and: moon2)
+        return HarmonyLevel.from(score: score)
+    }
+    
+    // MARK: - Rising Compatibility (First Impressions & Lifestyle)
+    
+    var risingCompatibility: String? {
+        guard let rising1 = person1Rising, let rising2 = person2Rising else { return nil }
+        return Self.getRisingCompatibilityReading(rising1: rising1, rising2: rising2)
+    }
+    
+    var risingHarmonyLevel: HarmonyLevel? {
+        guard let rising1 = person1Rising, let rising2 = person2Rising else { return nil }
+        let score = Self.calculateHarmonyScore(between: rising1, and: rising2)
+        return HarmonyLevel.from(score: score)
     }
     
     // MARK: - Oracle Readings
@@ -526,5 +597,61 @@ extension AstralCompatibility {
         
         "Aries-Libra": "Practice the art of taking turns—sometimes leading, sometimes following. Your opposite natures are your greatest teachers when approached with curiosity instead of frustration."
     ]
+    
+    // MARK: - Moon Compatibility Readings (Emotional Bond)
+    
+    static func getMoonCompatibilityReading(moon1: ZodiacSign, moon2: ZodiacSign) -> String {
+        let dynamic = ElementalDynamic.between(moon1.element, and: moon2.element)
+        
+        switch dynamic {
+        case .sameElement:
+            return "Your emotional worlds speak the same language. With both Moons in \(moon1.element) signs, you instinctively understand how each other processes feelings. \(moon1.rawValue) Moon meets \(moon2.rawValue) Moon creates a safe emotional harbor where vulnerability flows naturally. You may finish each other's emotional sentences."
+            
+        case .complementary:
+            return "Your emotional natures feed each other beautifully. \(moon1.rawValue) Moon's \(moon1.moonTraits) blends harmoniously with \(moon2.rawValue) Moon's \(moon2.moonTraits). Together, you create an emotional alchemy that neither could achieve alone—inspiring and uplifting each other through life's tides."
+            
+        case .challenging:
+            return "Your emotional languages differ, offering rich opportunities for growth. \(moon1.rawValue) Moon processes feelings through \(moon1.element.lowercased()) energy, while \(moon2.rawValue) Moon needs \(moon2.element.lowercased()) expression. With patience, these differences become your greatest teachers—each showing the other new ways to feel and heal."
+            
+        case .grounding:
+            return "Your Moons create a stabilizing emotional balance. \(moon1.rawValue) Moon brings \(moon1.moonTraits), while \(moon2.rawValue) Moon offers \(moon2.moonTraits). This combination grounds emotional extremes and provides a steady foundation for deep, lasting intimacy."
+        }
+    }
+    
+    // MARK: - Rising Compatibility Readings (First Impressions & Lifestyle)
+    
+    static func getRisingCompatibilityReading(rising1: ZodiacSign, rising2: ZodiacSign) -> String {
+        let dynamic = ElementalDynamic.between(rising1.element, and: rising2.element)
+        
+        switch dynamic {
+        case .sameElement:
+            return "You recognized something familiar in each other from the very first moment. With \(rising1.rawValue) Rising meeting \(rising2.rawValue) Rising, your approaches to life naturally align. You share similar lifestyles, social preferences, and ways of moving through the world. Others see you as a natural pair."
+            
+        case .complementary:
+            return "Your first impressions sparked an exciting curiosity. \(rising1.rawValue) Rising \(rising1.risingTraits), while \(rising2.rawValue) Rising \(rising2.risingTraits). Together, you present a dynamic duo to the world—your combined energies creating something greater than either alone."
+            
+        case .challenging:
+            return "Your initial meeting may have felt intriguing or even puzzling. \(rising1.rawValue) Rising's style contrasts with \(rising2.rawValue) Rising's approach to life. This tension creates magnetic attraction—you're drawn to qualities in each other that you're still developing in yourselves."
+            
+        case .grounding:
+            return "You bring out different sides of each other in social situations. \(rising1.rawValue) Rising and \(rising2.rawValue) Rising create a balanced presence together. Where one leads, the other supports, making you versatile partners in navigating life's varied landscapes."
+        }
+    }
+    
+    // MARK: - Complete Chart Compatibility Summary
+    
+    func getFullChartReading() -> String {
+        var reading = oracleReading
+        
+        if let moonReading = moonCompatibility {
+            reading += "\n\n🌙 **Emotional Connection (Moon)**\n\(moonReading)"
+        }
+        
+        if let risingReading = risingCompatibility {
+            reading += "\n\n⬆️ **First Impressions & Lifestyle (Rising)**\n\(risingReading)"
+        }
+        
+        return reading
+    }
 }
 
