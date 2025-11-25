@@ -8,6 +8,16 @@ struct ContactDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingCheckInSheet = false
     @State private var showingHoroscope = false
+    @State private var showingCompatibility = false
+    @AppStorage("userZodiacSign") private var userZodiacSign: String = "Aries"
+    
+    var userSign: ZodiacSign {
+        ZodiacSign(rawValue: userZodiacSign) ?? .aries
+    }
+    
+    var compatibility: AstralCompatibility {
+        AstralCompatibility(person1Sign: userSign, person2Sign: contact.zodiacSign)
+    }
     
     var horoscope: Horoscope {
         Horoscope.getWeeklyHoroscope(for: contact.zodiacSign)
@@ -21,6 +31,9 @@ struct ContactDetailView: View {
                 
                 // Zodiac & Horoscope Card
                 zodiacCard
+                
+                // Compatibility Card
+                compatibilityCard
                 
                 // Contact Info
                 if contact.phoneNumber != nil || contact.email != nil {
@@ -73,6 +86,9 @@ struct ContactDetailView: View {
         }
         .sheet(isPresented: $showingHoroscope) {
             HoroscopeDetailView(sign: contact.zodiacSign)
+        }
+        .sheet(isPresented: $showingCompatibility) {
+            CompatibilityView(contact: contact)
         }
     }
     
@@ -192,6 +208,107 @@ struct ContactDetailView: View {
             .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var compatibilityCard: some View {
+        Button {
+            showingCompatibility = true
+        } label: {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    // Your sign + their sign
+                    HStack(spacing: -8) {
+                        ZStack {
+                            Circle()
+                                .fill(elementColor(for: userSign).opacity(0.3))
+                                .frame(width: 36, height: 36)
+                            Text(userSign.emoji)
+                                .font(.title3)
+                        }
+                        
+                        ZStack {
+                            Circle()
+                                .fill(elementColor(for: contact.zodiacSign).opacity(0.3))
+                                .frame(width: 36, height: 36)
+                            Text(contact.zodiacSign.emoji)
+                                .font(.title3)
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your Compatibility")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                        
+                        Text("\(userSign.rawValue) + \(contact.zodiacSign.rawValue)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Spacer()
+                    
+                    // Harmony badge
+                    HStack(spacing: 4) {
+                        Text(compatibility.harmonyLevel.emoji)
+                            .font(.caption)
+                        Text("\(compatibility.harmonyScore)%")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(harmonyBadgeColor.opacity(0.2))
+                    .foregroundColor(harmonyBadgeColor)
+                    .cornerRadius(10)
+                    
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                
+                // Poetic summary preview
+                Text(compatibility.poeticSummary)
+                    .font(.caption)
+                    .italic()
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+                
+                // Harmony level description
+                HStack {
+                    Text(compatibility.harmonyLevel.rawValue)
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(harmonyBadgeColor)
+                    
+                    Text("•")
+                        .foregroundColor(.secondary)
+                    
+                    Text("Tap to explore your cosmic connection")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .background(
+                LinearGradient(
+                    colors: [harmonyBadgeColor.opacity(0.1), Color(UIColor.secondarySystemBackground)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(16)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private var harmonyBadgeColor: Color {
+        switch compatibility.harmonyLevel {
+        case .soulmates: return .yellow
+        case .deepConnection: return .purple
+        case .harmoniousFlow: return .blue
+        case .growthPartners: return .green
+        case .dynamicTension: return .orange
+        }
     }
     
     private var contactInfoSection: some View {
