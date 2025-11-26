@@ -243,6 +243,24 @@ enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
         }
     }
     
+    var keyTraits: String {
+        switch self {
+        case .aries: return "courageous, pioneering, competitive, energetic"
+        case .taurus: return "reliable, patient, sensual, determined"
+        case .gemini: return "curious, adaptable, communicative, witty"
+        case .cancer: return "nurturing, intuitive, protective, emotional"
+        case .leo: return "confident, creative, generous, dramatic"
+        case .virgo: return "analytical, practical, helpful, perfectionist"
+        case .libra: return "diplomatic, harmonious, romantic, fair-minded"
+        case .scorpio: return "passionate, resourceful, mysterious, determined"
+        case .sagittarius: return "adventurous, optimistic, philosophical, honest"
+        case .capricorn: return "ambitious, disciplined, responsible, patient"
+        case .aquarius: return "innovative, humanitarian, independent, original"
+        case .pisces: return "compassionate, artistic, intuitive, gentle"
+        case .unknown: return "unknown"
+        }
+    }
+    
     // Get zodiac sign from birthday
     static func from(birthday: Date) -> ZodiacSign {
         let calendar = Calendar.current

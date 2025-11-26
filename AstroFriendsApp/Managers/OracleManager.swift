@@ -26,45 +26,61 @@ class OracleManager: ObservableObject {
         
         defer { isLoading = false }
         
+        print("🔮 Generating oracle for: \(contact.name) (\(contact.id))")
+        
         // 1. Check if we already have fresh content this week
         if let cached = try? await SupabaseService.shared.fetchOracleContent(contactId: contact.id) {
+            print("✅ Found cached oracle for \(contact.name)")
             return cached
         }
         
+        print("📝 No cache found, generating fresh oracle...")
+        
         // 2. Get or create astro profile
-        let profile = try await getOrCreateAstroProfile(for: contact)
-        
-        // 3. Get weekly sky context
-        let weeklySky = try? await getOrFetchWeeklySky()
-        
-        // 4. Generate content with Gemini
-        let generated = try await GeminiService.shared.generateWeeklyOracle(
-            profile: profile,
-            weeklySky: weeklySky,
-            contactName: contact.name
-        )
-        
-        // 5. Create oracle content
-        let oracleContent = OracleContent(
-            contactId: contact.id,
-            weekStart: getWeekStart(from: Date()),
-            weeklyReading: generated.reading,
-            loveAdvice: generated.love,
-            careerAdvice: generated.career,
-            luckyNumber: generated.number,
-            luckyColor: generated.color,
-            mood: generated.mood,
-            compatibilitySign: generated.bestMatch,
-            celestialInsight: generated.insight
-        )
-        
-        // Try to save to Supabase (but don't fail if it doesn't work)
         do {
-            return try await SupabaseService.shared.upsertOracleContent(oracleContent)
+            let profile = try await getOrCreateAstroProfile(for: contact)
+            print("✅ Got astro profile: \(profile.sunSign)")
+            
+            // 3. Get weekly sky context
+            let weeklySky = try? await getOrFetchWeeklySky()
+            print("✅ Got weekly sky: \(weeklySky?.moonPhase ?? "none")")
+            
+            // 4. Generate content with Gemini
+            print("🤖 Calling Gemini...")
+            let generated = try await GeminiService.shared.generateWeeklyOracle(
+                profile: profile,
+                weeklySky: weeklySky,
+                contactName: contact.name
+            )
+            print("✅ Gemini returned content: \(generated.reading.prefix(50))...")
+            
+            // 5. Create oracle content
+            let oracleContent = OracleContent(
+                contactId: contact.id,
+                weekStart: getWeekStart(from: Date()),
+                weeklyReading: generated.reading,
+                loveAdvice: generated.love,
+                careerAdvice: generated.career,
+                luckyNumber: generated.number,
+                luckyColor: generated.color,
+                mood: generated.mood,
+                compatibilitySign: generated.bestMatch,
+                celestialInsight: generated.insight
+            )
+            
+            // Try to save to Supabase (but don't fail if it doesn't work)
+            do {
+                let saved = try await SupabaseService.shared.upsertOracleContent(oracleContent)
+                print("✅ Saved to Supabase")
+                return saved
+            } catch {
+                print("⚠️ Failed to save to Supabase: \(error.localizedDescription)")
+                // Return the content anyway - it works, just won't be cached
+                return oracleContent
+            }
         } catch {
-            print("⚠️ Failed to save to Supabase: \(error.localizedDescription)")
-            // Return the content anyway - it works, just won't be cached
-            return oracleContent
+            print("❌ Oracle generation failed: \(error)")
+            throw error
         }
     }
     
@@ -260,20 +276,26 @@ class OracleManager: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         
+        print("🔮 Generating weekly compatibility: \(contactA.name) + \(contactB.name)")
+        
         // Get profiles
         let profileA = try await getOrCreateAstroProfile(for: contactA)
         let profileB = try await getOrCreateAstroProfile(for: contactB)
+        print("✅ Got profiles: \(profileA.sunSign) + \(profileB.sunSign)")
         
         // Get weekly sky context
         let weeklySky = try? await getOrFetchWeeklySky()
+        print("✅ Weekly sky: \(weeklySky?.moonPhase ?? "none")")
         
         // Get base score from static calculation
         let baseScore = AstralCompatibility(
             person1Sign: contactA.zodiacSign,
             person2Sign: contactB.zodiacSign
         ).harmonyScore
+        print("✅ Base score: \(baseScore)")
         
         // Generate "This Week" compatibility with Gemini
+        print("🤖 Calling Gemini for weekly compatibility...")
         let weeklyGenerated = try await GeminiService.shared.generateWeeklyCompatibility(
             profileA: profileA,
             profileB: profileB,
@@ -284,6 +306,7 @@ class OracleManager: ObservableObject {
             nameA: contactA.name,
             nameB: contactB.name
         )
+        print("✅ Gemini returned: score=\(weeklyGenerated.score), vibe=\(weeklyGenerated.vibe ?? "nil")")
         
         // Create cache entry with weekly data
         let compat = CompatibilityCache(

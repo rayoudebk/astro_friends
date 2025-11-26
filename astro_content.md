@@ -17,9 +17,10 @@ The app uses **three tiers of content** that differ by how often they change and
 | Modality | `ZodiacSign.modality` | Aries = Cardinal |
 | Date ranges | `ZodiacSign.dateRange` | "Mar 21 - Apr 19" |
 | Emojis & icons | `ZodiacSign.emoji` | ♈️ |
+| Key traits | `ZodiacSign.keyTraits` | "courageous, pioneering, competitive" |
 | Moon phase meanings | `Horoscope.swift` → `MoonPhase` | Full Moon = "emotionally heightened" |
 | Moon sign traits | `MoonSign.emotionalFlavor` | Moon in Cancer = "nurturing" |
-| Base compatibility scores | `AstralCompatibility.swift` | Aries + Leo = 88% (hardcoded matrix) |
+| Base compatibility scores | `CompatibilityEngine.swift` | Aries + Leo = 88% |
 | Elemental dynamics | `ElementalDynamic` | Fire + Fire = "Passionate" |
 | Harmony level descriptions | `HarmonyLevel` | 85%+ = "Soulmates" |
 
@@ -33,22 +34,63 @@ The app uses **three tiers of content** that differ by how often they change and
 
 **What:** Content that changes each week but is the same for everyone with that zodiac sign.
 
-| Content | Current State | Should Be |
-|---------|---------------|-----------|
-| Weekly horoscope per sign | ❌ Hardcoded in `Horoscope.swift` | 🔄 Fetch from Supabase (AI-generated weekly) |
-| Moon phase for the week | ✅ Calculated locally | ✅ Could also fetch from AstrologyAPI |
-| Planetary transits | ✅ Fetched from AstrologyAPI | ✅ Stored as `WeeklySky` in Supabase |
-| Lucky number/color per sign | ❌ Hardcoded | 🔄 Part of weekly AI generation |
-| Sign's mood for the week | ✅ AI-generated | ✅ Stored in oracle, reused in compatibility |
+| Content | Current State | Source |
+|---------|---------------|--------|
+| Weekly horoscope per sign | ✅ AI or fallback | `ContentService.getWeeklyHoroscope()` |
+| Moon phase for the week | ✅ Calculated/API | `Horoscope.currentMoonPhase` |
+| Planetary transits | ✅ Fetched from API | `WeeklySky.transits` |
+| Lucky number/color per sign | ✅ AI-generated | `WeeklyHoroscope.luckyNumber/Color` |
+| Sign's mood for the week | ✅ AI-generated | `WeeklyHoroscope.mood` (authoritative) |
+| Power/Challenge days | ✅ AI-generated | `WeeklyHoroscope.powerDay/challengeDay` |
+| Weekly affirmation | ✅ AI-generated | `WeeklyHoroscope.affirmation` |
 
-**How it should work (target architecture):**
-1. Every Monday, a scheduled job generates 12 horoscopes (one per sign)
-2. Uses AstrologyAPI for current transits
-3. Uses Gemini to write the content
-4. Stores in Supabase `weekly_horoscopes` table
-5. All Aries users see the same Aries horoscope that week
+**Architecture:**
+```
+┌─────────────────────────────────────────────────────────┐
+│              TIER 2 FETCH FLOW                          │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  HomeView / HoroscopeCardView                           │
+│           │                                             │
+│           ▼                                             │
+│  ContentService.getWeeklyHoroscope(sign)                │
+│           │                                             │
+│           ├─► Check local cache (7-day expiry)          │
+│           │         │                                   │
+│           │         ├─► Cache hit → return              │
+│           │         │                                   │
+│           │         └─► Cache miss ↓                    │
+│           │                                             │
+│           ├─► Fetch from Supabase weekly_horoscopes     │
+│           │         │                                   │
+│           │         ├─► Found → cache & return          │
+│           │         │                                   │
+│           │         └─► Not found ↓                     │
+│           │                                             │
+│           └─► Fallback to static Tier 1                 │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+```
 
-**Currently:** ⚠️ Partially implemented - `Horoscope.getWeeklyHoroscope()` still returns hardcoded content as fallback
+**Supabase Table:** `weekly_horoscopes`
+```sql
+CREATE TABLE weekly_horoscopes (
+    sign TEXT NOT NULL,
+    week_start DATE NOT NULL,
+    weekly_reading TEXT NOT NULL,
+    mood TEXT NOT NULL,           -- AUTHORITATIVE for Tier 2
+    lucky_number INTEGER,
+    lucky_color TEXT,
+    love_forecast TEXT,
+    career_forecast TEXT,
+    power_day TEXT,
+    challenge_day TEXT,
+    affirmation TEXT,
+    UNIQUE(sign, week_start)
+);
+```
+
+**Currently:** ✅ Implemented - `ContentService.swift` unifies fetching
 
 ---
 
@@ -67,7 +109,7 @@ The app uses **three tiers of content** that differ by how often they change and
 
 **How it works now:**
 1. User opens contact with birthday
-2. `OracleManager.generateOracleContent()` is called
+2. `ContentService.getOracleContent()` is called
 3. Creates `AstroProfile` (sun/moon/rising)
 4. Calls Gemini with their specific chart data
 5. Returns personalized reading
@@ -79,24 +121,28 @@ The app uses **three tiers of content** that differ by how often they change and
 
 ## 🤝 Compatibility: From Static to Live
 
-Compatibility has evolved from a purely static system to a **three-layer model** that mixes local logic, live sky data, and AI.
+Compatibility uses a **three-layer model** with centralized logic in `CompatibilityEngine.swift`.
 
 ### Layer 1: Overall Compatibility (static, timeless) ✅
 
-**What it is:**
-- A stable, "baseline" score between two contacts.
+**Location:** `CompatibilityEngine.swift`
 
-**Inputs:**
-- Sun–Sun compatibility (existing 12×12 matrix in `AstralCompatibility.swift`)
-- Elemental harmony (Fire / Earth / Air / Water)
-- Modality harmony (Cardinal / Fixed / Mutable)
-- Moon compatibility bonus (existing)
-- Rising compatibility bonus (optional)
+**Functions:**
+```swift
+CompatibilityEngine.overallCompatibility(signA:signB:)
+CompatibilityEngine.fullCompatibility(sunA:moonA:risingA:sunB:moonB:risingB:)
+CompatibilityEngine.elementBonus(signA:signB:)
+CompatibilityEngine.modalityBonus(signA:signB:)
+CompatibilityEngine.moonCompatibility(moonA:moonB:)
+CompatibilityEngine.risingCompatibility(risingA:risingB:)
+CompatibilityEngine.poeticSummary(signA:signB:)
+CompatibilityEngine.nurturingAdvice(signA:signB:)
+```
 
 **Properties:**
 - Does **not** change over time.
 - Calculated locally in Swift.
-- Shown as the "Overall" score in the UI.
+- Shown as the "Overall" tab in CompatibilityView.
 
 **Status:** ✅ Implemented
 
@@ -104,20 +150,14 @@ Compatibility has evolved from a purely static system to a **three-layer model**
 
 ### Layer 2: This Week Compatibility (dynamic, weekly) ✅
 
-**What it is:**
-- A **weekly modifier** on top of Overall Compatibility that reflects the current sky and each person's weekly mood.
+**Location:** `ContentService.getThisWeekCompatibility()` → `OracleManager` → `GeminiService`
 
-**Additional inputs:**
-- `WeeklySky` (moon phase + major transits for the week)
-- Each person's weekly mood from their horoscope (Tier 3 / Oracle)
-- Optional synastry summary (from AstrologyAPI `synastry_horoscope`, sanitized)
+**Inputs:**
+- `WeeklySky` (moon phase + major transits)
+- Each person's weekly mood from Oracle
+- Base compatibility from Layer 1
 
-**How it's computed:**
-- `OracleManager.generateWeeklyCompatibility()` orchestrates the flow
-- `GeminiService.generateWeeklyCompatibility()` generates the AI reading
-- Gemini receives profiles, moods, and sky data, outputs structured JSON
-
-**Gemini Output:**
+**Output:**
 ```json
 {
   "thisWeekScore": 78,
@@ -130,45 +170,54 @@ Compatibility has evolved from a purely static system to a **three-layer model**
 }
 ```
 
-**Properties:**
-- Updated every Monday (or on-demand).
-- Stored in Supabase `compatibility_cache` table.
-- Shown as "This Week" tab in CompatibilityView.
-
 **Status:** ✅ Implemented
 
 ---
 
-### Layer 3: Live Compatibility (optional, daily or event-based) ⏳
+### Layer 3: Live Compatibility (optional, daily) ⏳
 
 **What it is:**
-- A more granular "today's vibe between you two" score/label.
+- A more granular "today's vibe" score/label.
 
-**Additional inputs:**
-- Current moon sign / phase
-- Short-term transits that strongly affect emotions/relationships
+**Placeholders:**
+```swift
+// Future: Add to CompatibilityCache
+var liveCompatibilityScore: Int?
+var liveCompatibilityStatus: LiveStatus? // .loading | .locked | .available
+var liveVibe: String?
+```
 
-**Properties:**
-- Can be updated daily or only when a big relevant transit occurs.
-- Shown as a subtle hint: e.g. "Today your connection feels a bit closer than usual."
-- Optional for MVP, but the architecture allows adding this layer later.
-
-**Status:** 🔜 Future enhancement
+**Status:** 🔜 Architecture ready for future
 
 ---
 
-## 🧩 Contact Completion & Locked Astro Features
+## 🧩 Contact Completion & Feature Unlock System
 
-The more astro data we have for a contact, the deeper the readings we can offer. The UI makes this transparent and motivating.
+The app uses `FeatureUnlock` to determine what features are available based on contact data.
 
 ### Completion Levels ✅
 
-| Level | Data Known | Features Available |
-|-------|------------|-------------------|
-| **None** | No birthday | Nothing (add birthday prompt) |
-| **Basic** | Birthday only | Sun sign traits, basic horoscope, Overall compatibility |
-| **Extended** | Birthday + time OR place | Moon sign insights, better Oracle readings |
-| **Full** | Birthday + time + place | Full chart, Rising sign, This Week compatibility, synastry |
+| Level | Data Known | Percentage |
+|-------|------------|------------|
+| **None** | No birthday | 0% |
+| **Basic** | Birthday only | 40% |
+| **Extended** | Birthday + time OR place | 70% |
+| **Full** | Birthday + time + place | 100% |
+
+### Feature Unlock Table ✅
+
+| Feature | Required Level | Source |
+|---------|---------------|--------|
+| Sun Sign Traits | Basic | Local |
+| Basic Horoscope | Basic | Local |
+| Overall Compatibility | Basic | Local |
+| Weekly Horoscope | Basic | Supabase (Tier 2) |
+| Moon Sign Insights | Extended | Local + Gemini |
+| Personal Oracle | Extended | Gemini (Tier 3) |
+| Rising Sign | Full | AstrologyAPI |
+| This Week Compatibility | Full | Gemini |
+| Synastry Insights | Full | Future |
+| Live Compatibility | Full | Future |
 
 ### Implementation ✅
 
@@ -179,13 +228,52 @@ var astroCompletionPercentage: Int  // 0-100
 var missingAstroData: [String]      // ["birth time", "birth place"]
 ```
 
-**UI Pattern:**
-- `ContactDetailView` shows completion indicator card when not full
-- Progress ring with percentage
-- "Add X to unlock deeper readings" inline CTA
-- `CompatibilityView` shows locked "This Week" tab with unlock prompt
+**Feature Unlock:**
+```swift
+FeatureUnlock.canAccess(.thisWeekCompatibility, for: contact)
+FeatureUnlock.unlockedFeatures(for: contact)
+FeatureUnlock.lockedFeatures(for: contact)
+FeatureUnlock.nextUnlocks(for: contact) // What to add to unlock more
+```
 
-**Privacy Note:** Birth details stay on-device. Only derived astro data (signs, not dates) is sent to Supabase/Gemini.
+**UI Pattern:**
+- `ContactDetailView` shows completion indicator card
+- `CompatibilityView` shows locked "This Week" tab
+- Inline CTAs: "Add birth time to unlock deeper readings"
+
+---
+
+## 📦 Unified Services Architecture
+
+### ContentService.swift ✅
+
+Centralizes all content fetching with caching:
+
+```swift
+ContentService.shared.getWeeklyHoroscope(for: sign)      // Tier 2
+ContentService.shared.getAllWeeklyHoroscopes()           // Batch Tier 2
+ContentService.shared.getWeeklySky()                     // Tier 2
+ContentService.shared.getOracleContent(for: contact)     // Tier 3
+ContentService.shared.getOverallCompatibility(user:contact:) // Tier 1
+ContentService.shared.getThisWeekCompatibility(user:contact:) // Dynamic
+ContentService.shared.clearCache()                       // Cache management
+ContentService.shared.refreshWeeklyContent()             // Force refresh
+```
+
+### CompatibilityEngine.swift ✅
+
+Centralizes all static compatibility calculations:
+
+```swift
+CompatibilityEngine.overallCompatibility(signA:signB:)
+CompatibilityEngine.fullCompatibility(...)
+CompatibilityEngine.elementBonus(signA:signB:)
+CompatibilityEngine.modalityBonus(signA:signB:)
+CompatibilityEngine.moonCompatibility(moonA:moonB:)
+CompatibilityEngine.risingCompatibility(risingA:risingB:)
+CompatibilityEngine.poeticSummary(signA:signB:)
+CompatibilityEngine.nurturingAdvice(signA:signB:)
+```
 
 ---
 
@@ -193,22 +281,37 @@ var missingAstroData: [String]      // ["birth time", "birth place"]
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                     CONTACT DETAIL VIEW                 │
+│                      HOME VIEW                          │
+├─────────────────────────────────────────────────────────┤
+│                                                         │
+│  Weekly Horoscope Card:                                 │
+│  ├─ Reading text           → Tier 2 ✨ OR Tier 1        │
+│  ├─ Mood badge             → Tier 2 ✨ OR Tier 1        │
+│  └─ ✨ badge if AI         → isAIGenerated flag        │
+│                                                         │
+│  Best/Growth Connections:                               │
+│  └─ Scores                 → CompatibilityEngine        │
+│                                                         │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│                  CONTACT DETAIL VIEW                    │
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Astro Completion Card (if not full):                   │
-│  └─ Completion %          → Local (Contact model)       │
+│  ├─ Completion %          → Contact.astroCompletionLevel│
+│  └─ Missing data          → Contact.missingAstroData    │
 │                                                         │
 │  Weekly Horoscope Card:                                 │
-│  ├─ Sign emoji/name/dates  → Static (ZodiacSign)       │
-│  ├─ Mood badge             → AI Oracle ✨ OR Fallback   │
-│  ├─ Reading text           → AI Oracle ✨ OR Fallback   │
-│  └─ Lucky #, Color         → AI Oracle ✨               │
+│  ├─ Sign emoji/dates      → Static (ZodiacSign)        │
+│  ├─ Mood badge            → AI Oracle ✨ OR Fallback    │
+│  ├─ Reading text          → AI Oracle ✨ OR Fallback    │
+│  └─ Lucky #, Color        → AI Oracle ✨                │
 │                                                         │
 │  Compatibility Card:                                    │
-│  ├─ Score percentage       → Static (AstralCompatibility)│
-│  ├─ Harmony level          → Static (HarmonyLevel enum) │
-│  └─ Poetic summary         → Static (hardcoded strings) │
+│  ├─ Score percentage      → CompatibilityEngine         │
+│  ├─ Harmony level         → CompatibilityEngine         │
+│  └─ Poetic summary        → CompatibilityEngine         │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 
@@ -217,33 +320,19 @@ var missingAstroData: [String]      // ["birth time", "birth place"]
 ├─────────────────────────────────────────────────────────┤
 │                                                         │
 │  Tab: Overall                                           │
-│  ├─ Harmony score          → Static (AstralCompatibility)│
-│  ├─ Poetic summary         → Static                     │
-│  ├─ Oracle reading         → Static                     │
-│  ├─ Moon/Rising compat     → Static (if data available) │
-│  ├─ Strengths/Growth       → Static                     │
-│  └─ Nurturing advice       → Static                     │
+│  ├─ Harmony score         → CompatibilityEngine         │
+│  ├─ Poetic summary        → CompatibilityEngine         │
+│  ├─ Moon/Rising compat    → CompatibilityEngine         │
+│  ├─ Strengths/Growth      → AstralCompatibility         │
+│  └─ Nurturing advice      → CompatibilityEngine         │
 │                                                         │
 │  Tab: This Week ✨ (or 🔒 if locked)                    │
-│  ├─ This week score        → AI (Gemini) via Supabase   │
-│  ├─ Weekly vibe badge      → AI                         │
-│  ├─ Love/Communication     → AI                         │
-│  ├─ Weekly reading         → AI                         │
-│  ├─ Celestial influence    → AI + WeeklySky             │
-│  └─ Growth tip             → AI                         │
-│                                                         │
-└─────────────────────────────────────────────────────────┘
-
-┌─────────────────────────────────────────────────────────┐
-│                     HOME VIEW                           │
-├─────────────────────────────────────────────────────────┤
-│                                                         │
-│  Your Weekly Horoscope:                                 │
-│  ├─ All content            → Static (Horoscope.swift)  │
-│  └─ Moon phase             → Calculated locally         │
-│                                                         │
-│  Best/Growth Connections:                               │
-│  └─ Scores                 → Static (AstralCompatibility)│
+│  ├─ This week score       → ContentService → Gemini     │
+│  ├─ Weekly vibe badge     → Gemini                      │
+│  ├─ Love/Communication    → Gemini                      │
+│  ├─ Weekly reading        → Gemini                      │
+│  ├─ Celestial influence   → Gemini + WeeklySky          │
+│  └─ Growth tip            → Gemini                      │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -260,61 +349,67 @@ var missingAstroData: [String]      // ["birth time", "birth place"]
                              │
               ┌──────────────┼──────────────┐
               ▼              ▼              ▼
-        ┌──────────┐  ┌──────────────┐  ┌──────────┐
-        │  LOCAL   │  │ ASTROLOGYAPI │  │  GEMINI  │
-        │ (Static) │  │   (Charts)   │  │   (AI)   │
-        └────┬─────┘  └──────┬───────┘  └────┬─────┘
-             │               │               │
-             │               ▼               │
-             │        ┌──────────────┐       │
-             │        │ AstroProfile │       │
-             │        │ + WeeklySky  │       │
-             │        └──────┬───────┘       │
-             │               │               │
-             │               └───────┬───────┘
-             │                       ▼
-             │         ┌─────────────────────┐
-             │         │ OracleContent       │
-             │         │ CompatibilityCache  │
-             │         │ (personalized)      │
-             │         └─────────┬───────────┘
-             │                   │
-             │                   ▼
-             │          ┌────────────────┐
-             │          │   SUPABASE     │
-             │          │   (cache)      │
-             │          └────────────────┘
-             │
-             ▼
-    ┌────────────────┐
-    │  Fallback if   │
-    │  no API/cache  │
-    └────────────────┘
+        ┌──────────────┐ ┌──────────────┐ ┌──────────┐
+        │   CONTENT    │ │ ASTROLOGYAPI │ │  GEMINI  │
+        │   SERVICE    │ │   (Charts)   │ │   (AI)   │
+        └──────┬───────┘ └──────┬───────┘ └────┬─────┘
+               │                │               │
+               ▼                ▼               │
+        ┌──────────────┐ ┌──────────────┐      │
+        │ COMPATIBILITY│ │ AstroProfile │      │
+        │   ENGINE     │ │ + WeeklySky  │      │
+        │  (Static)    │ └──────┬───────┘      │
+        └──────────────┘        │              │
+                                └──────┬───────┘
+                                       ▼
+                         ┌─────────────────────┐
+                         │ OracleContent       │
+                         │ WeeklyHoroscope     │
+                         │ CompatibilityCache  │
+                         └─────────┬───────────┘
+                                   │
+                                   ▼
+                          ┌────────────────┐
+                          │   SUPABASE     │
+                          │   (cache)      │
+                          └────────────────┘
 ```
 
 ---
 
 ## 📋 Summary: What Should Change vs What's Static
 
-| Question | Answer |
-|----------|--------|
-| "What sign is someone born March 25?" | **Static** - Aries, always |
-| "What element is Aries?" | **Static** - Fire, always |
-| "Are Aries and Leo compatible?" | **Static base** - 88% (Overall) |
-| "How compatible are they THIS WEEK?" | **Dynamic** - AI-generated weekly |
-| "What's this week's horoscope for Aries?" | **Weekly Global** - Same for all Aries |
-| "What's Kate's (Aquarius ☀️ Sagittarius 🌙) reading?" | **Personalized** - Unique to her chart |
-| "What's Kate's lucky number this week?" | **Personalized** - Generated by AI |
-| "What can I unlock by adding birth time?" | **Completion Level** - Extended → Full features |
+| Question | Answer | Source |
+|----------|--------|--------|
+| "What sign is March 25?" | **Static** - Aries | ZodiacSign |
+| "What element is Aries?" | **Static** - Fire | ZodiacSign |
+| "Base compatibility?" | **Static** - 88% | CompatibilityEngine |
+| "This week's connection?" | **Dynamic** - AI | ContentService → Gemini |
+| "Aries horoscope this week?" | **Tier 2** - Same for all | ContentService |
+| "Kate's personal reading?" | **Tier 3** - Unique | OracleManager → Gemini |
+| "What can I unlock?" | **Feature Table** | FeatureUnlock |
 
 ---
 
-## 🚀 Future Improvements
+## 🚀 Implementation Status
 
-1. ~~**Weekly Global Horoscopes**~~ - Run scheduled job to generate 12 sign horoscopes every Monday
-2. ~~**AI Compatibility**~~ - ✅ "This Week" compatibility implemented
-3. **Synastry** - Use AstrologyAPI's synastry endpoint for detailed chart comparison
-4. **Push Notifications** - "Your weekly reading is ready!"
-5. **Birth Time Prompts** - Ask users for birth time to improve Rising sign accuracy
-6. **Live Compatibility** - Daily vibe based on moon transits (Layer 3)
-7. **Venus/Mars placements** - Enhanced love compatibility
+### Completed ✅
+1. ~~Weekly horoscopes table schema~~
+2. ~~ContentService.swift (unified fetching)~~
+3. ~~CompatibilityEngine.swift (centralized static)~~
+4. ~~FeatureUnlock system (truth table)~~
+5. ~~HomeView Tier 2 integration~~
+6. ~~HoroscopeCardView Tier 2 integration~~
+7. ~~GeminiService.generateWeeklySignHoroscope()~~
+8. ~~"This Week" Compatibility UI + logic~~
+
+### In Progress 🔄
+9. Separate Tier 2 vs Tier 3 cards in ContactDetailView
+10. WeeklySky cron job (Supabase function)
+
+### Future 🔜
+11. Live Compatibility (Layer 3) placeholders
+12. Synastry deep compatibility
+13. Push notifications
+14. Birth time prompts
+15. Venus/Mars placements

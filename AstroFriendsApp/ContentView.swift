@@ -286,6 +286,7 @@ struct HoroscopeCardView: View {
     let selectedSign: ZodiacSign?
     let onSignTap: (ZodiacSign) -> Void
     @State private var currentSignIndex = 0
+    @State private var weeklyHoroscope: WeeklyHoroscope?
     
     private let timer = Timer.publish(every: 5, on: .main, in: .common).autoconnect()
     
@@ -300,8 +301,22 @@ struct HoroscopeCardView: View {
         return ZodiacSign.realSigns[currentSignIndex % ZodiacSign.realSigns.count]
     }
     
-    var horoscope: Horoscope {
+    // Fallback to static
+    var staticHoroscope: Horoscope {
         Horoscope.getWeeklyHoroscope(for: displayedSign)
+    }
+    
+    // Display values: Tier 2 → Tier 1 fallback
+    var displayReading: String {
+        weeklyHoroscope?.weeklyReading ?? staticHoroscope.weeklyReading
+    }
+    
+    var displayMood: String {
+        weeklyHoroscope?.mood ?? staticHoroscope.mood
+    }
+    
+    var isAIGenerated: Bool {
+        weeklyHoroscope?.isAIGenerated ?? false
     }
     
     var moonPhase: MoonPhase {
@@ -359,7 +374,7 @@ struct HoroscopeCardView: View {
                     Spacer()
                     
                     VStack(alignment: .trailing, spacing: 4) {
-                        Text(horoscope.mood)
+                        Text(displayMood)
                             .font(.caption)
                             .fontWeight(.medium)
                             .padding(.horizontal, 8)
@@ -367,7 +382,7 @@ struct HoroscopeCardView: View {
                             .background(Color.white.opacity(0.2))
                             .cornerRadius(8)
                         
-                        Text("Lucky: \(horoscope.luckyNumber)")
+                        Text("Lucky: \(weeklyHoroscope?.luckyNumber ?? staticHoroscope.luckyNumber)")
                             .font(.caption2)
                             .foregroundColor(.white.opacity(0.7))
                     }
@@ -383,7 +398,7 @@ struct HoroscopeCardView: View {
                     .cornerRadius(8)
                 
                 // Reading preview
-                Text(horoscope.weeklyReading)
+                Text(displayReading)
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.9))
                     .lineLimit(2)
@@ -435,7 +450,22 @@ struct HoroscopeCardView: View {
             if let sign = newValue, let index = ZodiacSign.realSigns.firstIndex(of: sign) {
                 currentSignIndex = index
             }
+            Task {
+                await loadWeeklyHoroscope()
+            }
         }
+        .onChange(of: currentSignIndex) { _, _ in
+            Task {
+                await loadWeeklyHoroscope()
+            }
+        }
+        .task {
+            await loadWeeklyHoroscope()
+        }
+    }
+    
+    private func loadWeeklyHoroscope() async {
+        weeklyHoroscope = await ContentService.shared.getWeeklyHoroscope(for: displayedSign)
     }
 }
 

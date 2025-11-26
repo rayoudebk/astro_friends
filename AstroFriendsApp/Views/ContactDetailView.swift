@@ -9,10 +9,16 @@ struct ContactDetailView: View {
     @State private var showingEditSheet = false
     @State private var showingHoroscope = false
     @State private var showingCompatibility = false
+    @AppStorage("userZodiacSign") private var userZodiacSign: String = "Aries"
+    
+    // Tier 2: Weekly Sign Horoscope (same for all of this sign)
+    @State private var weeklyHoroscope: WeeklyHoroscope?
+    @State private var isLoadingTier2 = false
+    
+    // Tier 3: Personal Oracle (unique to this contact)
     @State private var oracleContent: OracleContent?
     @State private var isLoadingOracle = false
     @State private var oracleError: String?
-    @AppStorage("userZodiacSign") private var userZodiacSign: String = "Aries"
     
     var userSign: ZodiacSign {
         ZodiacSign(rawValue: userZodiacSign) ?? .aries
@@ -22,18 +28,27 @@ struct ContactDetailView: View {
         AstralCompatibility(person1Sign: userSign, person2Sign: contact.zodiacSign)
     }
     
-    // Fallback to local horoscope if no oracle content
-    var horoscope: Horoscope {
+    // Tier 1 fallback
+    var staticHoroscope: Horoscope {
         Horoscope.getWeeklyHoroscope(for: contact.zodiacSign)
     }
     
-    // Use oracle content if available, else fallback
-    var displayReading: String {
-        oracleContent?.weeklyReading ?? horoscope.weeklyReading
+    // Tier 2 display values (Supabase → static fallback)
+    var tier2Reading: String {
+        weeklyHoroscope?.weeklyReading ?? staticHoroscope.weeklyReading
     }
     
-    var displayMood: String {
-        oracleContent?.mood ?? horoscope.mood
+    var tier2Mood: String {
+        weeklyHoroscope?.mood ?? staticHoroscope.mood
+    }
+    
+    var isTier2AIGenerated: Bool {
+        weeklyHoroscope?.isAIGenerated ?? false
+    }
+    
+    // Check if Tier 3 is unlocked (Extended or Full profile)
+    var canAccessTier3: Bool {
+        FeatureUnlock.canAccess(.personalOracle, for: contact)
     }
     
     var body: some View {
@@ -47,8 +62,13 @@ struct ContactDetailView: View {
                     astroCompletionCard
                 }
                 
-                // Zodiac & Horoscope Card
-                zodiacCard
+                // Tier 2: Sign's Weekly Horoscope (same for all of this sign)
+                tier2HoroscopeCard
+                
+                // Tier 3: Personal Oracle (unique to this person) - only if unlocked
+                if canAccessTier3 {
+                    tier3OracleCard
+                }
                 
                 // Compatibility Card
                 compatibilityCard
@@ -114,14 +134,34 @@ struct ContactDetailView: View {
         }
         .preferredColorScheme(.dark)
         .task {
-            await loadOracleContent()
+            await loadContent()
         }
     }
     
-    // MARK: - Oracle Loading
+    // MARK: - Content Loading
     
-    private func loadOracleContent() async {
+    private func loadContent() async {
         guard !contact.zodiacSign.isMissingInfo else { return }
+        
+        // Load Tier 2 and Tier 3 in parallel
+        async let tier2Task: () = loadTier2Horoscope()
+        async let tier3Task: () = loadTier3Oracle()
+        
+        _ = await (tier2Task, tier3Task)
+    }
+    
+    // MARK: - Tier 2 Loading (Sign Horoscope)
+    
+    private func loadTier2Horoscope() async {
+        isLoadingTier2 = true
+        weeklyHoroscope = await ContentService.shared.getWeeklyHoroscope(for: contact.zodiacSign)
+        isLoadingTier2 = false
+    }
+    
+    // MARK: - Tier 3 Loading (Personal Oracle)
+    
+    private func loadTier3Oracle() async {
+        guard canAccessTier3 else { return }
         
         isLoadingOracle = true
         oracleError = nil
@@ -322,7 +362,9 @@ struct ContactDetailView: View {
         }
     }
     
-    private var zodiacCard: some View {
+    // MARK: - Tier 2: Sign's Weekly Horoscope Card
+    
+    private var tier2HoroscopeCard: some View {
         Group {
             if contact.zodiacSign.isMissingInfo {
                 // Show prompt to add birthday
@@ -379,132 +421,251 @@ struct ContactDetailView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                VStack(spacing: 12) {
-                    Button {
-                        showingHoroscope = true
-                    } label: {
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Text(contact.zodiacSign.emoji)
-                                    .font(.title)
-                                
-                                VStack(alignment: .leading, spacing: 2) {
-                                    HStack(spacing: 6) {
-                                        Text("Weekly Horoscope")
-                                            .font(.headline)
-                                            .foregroundColor(.white)
-                                        
-                                        if oracleContent != nil {
-                                            Image(systemName: "sparkles")
-                                                .font(.caption)
-                                                .foregroundColor(.yellow)
-                                        }
-                                    }
+                // Tier 2: This sign's horoscope this week
+                Button {
+                    showingHoroscope = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(contact.zodiacSign.emoji)
+                                .font(.title)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                HStack(spacing: 6) {
+                                    Text("\(contact.zodiacSign.rawValue) This Week")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
                                     
-                                    Text(contact.zodiacSign.dateRange)
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.6))
-                                }
-                                
-                                Spacer()
-                                
-                                HStack(spacing: 4) {
-                                    if !isLoadingOracle || oracleContent != nil {
-                                        Text(displayMood)
+                                    if isTier2AIGenerated {
+                                        Image(systemName: "sparkles")
                                             .font(.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(elementColor(for: contact.zodiacSign).opacity(0.3))
-                                            .foregroundColor(elementColor(for: contact.zodiacSign))
-                                            .cornerRadius(8)
+                                            .foregroundColor(.yellow)
                                     }
-                                    
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.5))
                                 }
-                            }
-                            
-                            if isLoadingOracle && oracleContent == nil {
-                                HStack(spacing: 8) {
-                                    ProgressView()
-                                        .tint(.white.opacity(0.5))
-                                        .scaleEffect(0.8)
-                                    Text("Consulting the stars...")
-                                        .font(.caption)
-                                        .foregroundColor(.white.opacity(0.5))
-                                        .italic()
-                                }
-                            } else {
-                                Text(displayReading)
+                                
+                                Text(contact.zodiacSign.dateRange)
                                     .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .lineLimit(2)
+                                    .foregroundColor(.white.opacity(0.6))
                             }
                             
-                            // Show oracle extras if available
-                            if let oracle = oracleContent {
-                                HStack(spacing: 12) {
-                                    if let lucky = oracle.luckyNumber {
-                                        Label("\(lucky)", systemImage: "number")
-                                            .font(.caption2)
-                                            .foregroundColor(.white.opacity(0.6))
-                                    }
-                                    if let color = oracle.luckyColor {
-                                        Label(color, systemImage: "paintpalette")
-                                            .font(.caption2)
-                                            .foregroundColor(.white.opacity(0.6))
-                                    }
-                                }
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
+                                Text(tier2Mood)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(elementColor(for: contact.zodiacSign).opacity(0.3))
+                                    .foregroundColor(elementColor(for: contact.zodiacSign))
+                                    .cornerRadius(8)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.5))
                             }
                         }
-                        .padding()
-                        .background(
+                        
+                        if isLoadingTier2 && weeklyHoroscope == nil {
+                            HStack(spacing: 8) {
+                                ProgressView()
+                                    .tint(.white.opacity(0.5))
+                                    .scaleEffect(0.8)
+                                Text("Loading horoscope...")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        } else {
+                            Text(tier2Reading)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(2)
+                        }
+                        
+                        // Show Tier 2 extras if available
+                        if let horoscope = weeklyHoroscope {
+                            HStack(spacing: 12) {
+                                Label("\(horoscope.luckyNumber)", systemImage: "number")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.6))
+                                
+                                Label(horoscope.luckyColor, systemImage: "paintpalette")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        }
+                        
+                        // Tier 2 label
+                        HStack {
+                            Image(systemName: "person.3.fill")
+                                .font(.caption2)
+                            Text("Same for all \(contact.zodiacSign.rawValue)")
+                                .font(.caption2)
+                        }
+                        .foregroundColor(.white.opacity(0.4))
+                    }
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [Color.indigo.opacity(0.2), Color.purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+    }
+    
+    // MARK: - Tier 3: Personal Oracle Card
+    
+    private var tier3OracleCard: some View {
+        VStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundStyle(
                             LinearGradient(
-                                colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
+                                colors: [.yellow, .orange],
                                 startPoint: .topLeading,
                                 endPoint: .bottomTrailing
                             )
                         )
-                        .cornerRadius(16)
-                    }
-                    .buttonStyle(PlainButtonStyle())
                     
-                    // Refresh option (only show when content exists)
-                    if oracleContent != nil && !isLoadingOracle {
-                        Button {
-                            Task {
-                                await generateFreshOracle()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: "arrow.clockwise")
-                                Text("Refresh Oracle")
-                            }
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                        }
-                    }
-                    
-                    // Error display with retry
-                    if let error = oracleError {
-                        VStack(spacing: 8) {
-                            Text(error)
-                                .font(.caption2)
-                                .foregroundColor(.red.opacity(0.8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 6) {
+                            Text("Personal Oracle")
+                                .font(.headline)
+                                .foregroundColor(.white)
                             
-                            Button {
-                                Task {
-                                    await generateFreshOracle()
-                                }
-                            } label: {
-                                Text("Retry")
-                                    .font(.caption)
-                                    .foregroundColor(.purple)
+                            Text("TIER 3")
+                                .font(.caption2)
+                                .fontWeight(.bold)
+                                .foregroundColor(.yellow)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.yellow.opacity(0.2))
+                                .cornerRadius(4)
+                        }
+                        
+                        Text("Personalized for \(contact.name.components(separatedBy: " ").first ?? contact.name)")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    
+                    Spacer()
+                    
+                    if oracleContent != nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                    }
+                }
+                
+                if isLoadingOracle && oracleContent == nil {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .tint(.yellow.opacity(0.8))
+                            .scaleEffect(0.8)
+                        Text("Consulting the celestial oracle...")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                            .italic()
+                    }
+                    .padding(.vertical, 8)
+                } else if let oracle = oracleContent {
+                    // Personal reading
+                    Text(oracle.weeklyReading)
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.85))
+                        .fixedSize(horizontal: false, vertical: true)
+                    
+                    // Personal details
+                    HStack(spacing: 16) {
+                        if let lucky = oracle.luckyNumber {
+                            VStack(spacing: 2) {
+                                Text("\(lucky)")
+                                    .font(.headline)
+                                    .foregroundColor(.yellow)
+                                Text("Lucky #")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
                             }
                         }
-                        .padding(.horizontal)
+                        
+                        if let color = oracle.luckyColor {
+                            VStack(spacing: 2) {
+                                Text(color)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.purple)
+                                Text("Color")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        
+                        if let mood = oracle.mood {
+                            VStack(spacing: 2) {
+                                Text(mood)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.cyan)
+                                Text("Vibe")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
                     }
+                    .padding(.top, 4)
+                    
+                    // Celestial insight
+                    if let insight = oracle.celestialInsight {
+                        Text("✨ \(insight)")
+                            .font(.caption)
+                            .italic()
+                            .foregroundColor(.white.opacity(0.7))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 6)
+                    }
+                } else if let error = oracleError {
+                    VStack(spacing: 8) {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red.opacity(0.8))
+                        
+                        Button {
+                            Task { await generateFreshOracle() }
+                        } label: {
+                            Text("Retry")
+                                .font(.caption)
+                                .foregroundColor(.yellow)
+                        }
+                    }
+                }
+            }
+            .padding()
+            .background(
+                LinearGradient(
+                    colors: [Color.yellow.opacity(0.15), Color.orange.opacity(0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .cornerRadius(16)
+            
+            // Refresh option
+            if oracleContent != nil && !isLoadingOracle {
+                Button {
+                    Task { await generateFreshOracle() }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh Personal Oracle")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
                 }
             }
         }

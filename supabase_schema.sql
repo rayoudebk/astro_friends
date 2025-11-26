@@ -42,8 +42,37 @@ CREATE TABLE IF NOT EXISTS weekly_sky (
 CREATE INDEX IF NOT EXISTS idx_weekly_sky_week ON weekly_sky(week_start);
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- TABLE: oracle_content
--- AI-generated weekly readings per contact
+-- TABLE: weekly_horoscopes (TIER 2)
+-- AI-generated weekly horoscopes PER SIGN (same for all users of that sign)
+-- Generated every Monday via scheduled job
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS weekly_horoscopes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    sign TEXT NOT NULL,               -- e.g., "aries", "taurus"
+    week_start DATE NOT NULL,         -- Monday of the week
+    weekly_reading TEXT NOT NULL,     -- Main horoscope text
+    mood TEXT NOT NULL,               -- Single word mood (authoritative for Tier 2)
+    lucky_number INTEGER,
+    lucky_color TEXT,
+    love_forecast TEXT,
+    career_forecast TEXT,
+    health_tip TEXT,
+    power_day TEXT,                   -- Best day this week
+    challenge_day TEXT,               -- Most challenging day
+    affirmation TEXT,                 -- Weekly affirmation
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- One entry per sign per week
+    UNIQUE(sign, week_start)
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_weekly_horo_sign ON weekly_horoscopes(sign);
+CREATE INDEX IF NOT EXISTS idx_weekly_horo_week ON weekly_horoscopes(week_start);
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- TABLE: oracle_content (TIER 3)
+-- AI-generated weekly readings per contact (personalized)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS oracle_content (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -90,6 +119,11 @@ CREATE TABLE IF NOT EXISTS compatibility_cache (
     weekly_reading TEXT,              -- AI-generated weekly reading
     growth_advice TEXT,               -- Weekly tip
     celestial_influence TEXT,         -- How current transits affect them
+    
+    -- Layer 3: Live (future - daily or event-based)
+    live_score INTEGER,               -- Today's adjusted score
+    live_vibe TEXT,                   -- Today's connection vibe
+    live_updated_at TIMESTAMPTZ,      -- When live was last updated
     
     week_start DATE,
     created_at TIMESTAMPTZ DEFAULT NOW(),

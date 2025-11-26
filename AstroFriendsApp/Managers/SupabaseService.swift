@@ -53,10 +53,20 @@ actor SupabaseService {
     func upsertWeeklySky(_ sky: WeeklySky) async throws -> WeeklySky {
         let endpoint = "\(restURL)/weekly_sky"
         
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-        let body = try encoder.encode(sky)
+        // Build JSON manually to handle DATE format for week_start
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        var dict: [String: Any] = [
+            "week_start": dateFormatter.string(from: sky.weekStart),
+            "moon_phase": sky.moonPhase
+        ]
+        
+        if let id = sky.id { dict["id"] = id.uuidString }
+        if let moonSign = sky.moonSign { dict["moon_sign"] = moonSign }
+        if let transits = sky.transits { dict["transits"] = transits }
+        
+        let body = try JSONSerialization.data(withJSONObject: dict)
         
         return try await upsert(endpoint: endpoint, body: body, onConflict: "week_start")
     }
@@ -64,7 +74,9 @@ actor SupabaseService {
     /// Fetch current week's sky data
     func fetchCurrentWeeklySky() async throws -> WeeklySky? {
         let weekStart = getWeekStart(from: Date())
-        let dateString = ISO8601DateFormatter().string(from: weekStart)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: weekStart)
         let endpoint = "\(restURL)/weekly_sky?week_start=eq.\(dateString)"
         
         let results: [WeeklySky] = try await get(endpoint: endpoint)
@@ -77,10 +89,26 @@ actor SupabaseService {
     func upsertOracleContent(_ content: OracleContent) async throws -> OracleContent {
         let endpoint = "\(restURL)/oracle_content"
         
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-        let body = try encoder.encode(content)
+        // Build JSON manually to handle DATE format for week_start
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        var dict: [String: Any] = [
+            "contact_id": content.contactId.uuidString,
+            "week_start": dateFormatter.string(from: content.weekStart),
+            "weekly_reading": content.weeklyReading
+        ]
+        
+        if let id = content.id { dict["id"] = id.uuidString }
+        if let loveAdvice = content.loveAdvice { dict["love_advice"] = loveAdvice }
+        if let careerAdvice = content.careerAdvice { dict["career_advice"] = careerAdvice }
+        if let luckyNumber = content.luckyNumber { dict["lucky_number"] = luckyNumber }
+        if let luckyColor = content.luckyColor { dict["lucky_color"] = luckyColor }
+        if let mood = content.mood { dict["mood"] = mood }
+        if let compatibilitySign = content.compatibilitySign { dict["compatibility_sign"] = compatibilitySign }
+        if let celestialInsight = content.celestialInsight { dict["celestial_insight"] = celestialInsight }
+        
+        let body = try JSONSerialization.data(withJSONObject: dict)
         
         return try await upsert(endpoint: endpoint, body: body, onConflict: "contact_id,week_start")
     }
@@ -88,7 +116,9 @@ actor SupabaseService {
     /// Fetch oracle content for a contact
     func fetchOracleContent(contactId: UUID, weekStart: Date? = nil) async throws -> OracleContent? {
         let week = weekStart ?? getWeekStart(from: Date())
-        let dateString = ISO8601DateFormatter().string(from: week)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: week)
         let endpoint = "\(restURL)/oracle_content?contact_id=eq.\(contactId.uuidString)&week_start=eq.\(dateString)"
         
         let results: [OracleContent] = try await get(endpoint: endpoint)
@@ -98,7 +128,9 @@ actor SupabaseService {
     /// Fetch all oracle content for current week
     func fetchAllOracleContent() async throws -> [OracleContent] {
         let weekStart = getWeekStart(from: Date())
-        let dateString = ISO8601DateFormatter().string(from: weekStart)
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        let dateString = dateFormatter.string(from: weekStart)
         let endpoint = "\(restURL)/oracle_content?week_start=eq.\(dateString)"
         
         return try await get(endpoint: endpoint)
@@ -110,10 +142,33 @@ actor SupabaseService {
     func upsertCompatibility(_ compat: CompatibilityCache) async throws -> CompatibilityCache {
         let endpoint = "\(restURL)/compatibility_cache"
         
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .iso8601
-        let body = try encoder.encode(compat)
+        // Build JSON manually to handle DATE format for week_start
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        
+        var dict: [String: Any] = [
+            "contact_a": compat.contactA.uuidString,
+            "contact_b": compat.contactB.uuidString,
+            "base_score": compat.baseScore
+        ]
+        
+        if let id = compat.id { dict["id"] = id.uuidString }
+        if let synastry = compat.synastryHighlights { dict["synastry_highlights"] = synastry }
+        if let aiOutput = compat.aiOutput { dict["ai_output"] = aiOutput }
+        if let weekStart = compat.weekStart { dict["week_start"] = dateFormatter.string(from: weekStart) }
+        if let thisWeekScore = compat.thisWeekScore { dict["this_week_score"] = thisWeekScore }
+        if let loveCompat = compat.loveCompatibility { dict["love_compatibility"] = loveCompat }
+        if let commCompat = compat.communicationCompatibility { dict["communication_compatibility"] = commCompat }
+        if let weeklyVibe = compat.weeklyVibe { dict["weekly_vibe"] = weeklyVibe }
+        if let weeklyReading = compat.weeklyReading { dict["weekly_reading"] = weeklyReading }
+        if let growthAdvice = compat.growthAdvice { dict["growth_advice"] = growthAdvice }
+        if let celestialInfluence = compat.celestialInfluence { dict["celestial_influence"] = celestialInfluence }
+        if let liveScore = compat.liveScore { dict["live_score"] = liveScore }
+        if let liveVibe = compat.liveVibe { dict["live_vibe"] = liveVibe }
+        // liveUpdatedAt uses TIMESTAMPTZ so ISO8601 is fine
+        if let liveUpdatedAt = compat.liveUpdatedAt { dict["live_updated_at"] = ISO8601DateFormatter().string(from: liveUpdatedAt) }
+        
+        let body = try JSONSerialization.data(withJSONObject: dict)
         
         return try await upsert(endpoint: endpoint, body: body, onConflict: "contact_a,contact_b")
     }
@@ -180,8 +235,8 @@ actor SupabaseService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
-        // Key header for upsert: merge duplicates instead of error
-        request.setValue("resolution=merge-duplicates", forHTTPHeaderField: "Prefer")
+        // Key headers for upsert: merge duplicates AND return the result
+        request.setValue("resolution=merge-duplicates,return=representation", forHTTPHeaderField: "Prefer")
         request.httpBody = body
         
         let (data, response) = try await URLSession.shared.data(for: request)
@@ -192,18 +247,51 @@ actor SupabaseService {
         
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
+            print("⚠️ Supabase error (\(httpResponse.statusCode)): \(errorBody)")
             throw SupabaseError.httpError(statusCode: httpResponse.statusCode, message: errorBody)
         }
         
+        // Debug: Print raw response
+        let rawResponse = String(data: data, encoding: .utf8) ?? "nil"
+        print("📦 Supabase upsert response: \(rawResponse.prefix(500))")
+        
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
-        
-        let results = try decoder.decode([T].self, from: data)
-        guard let first = results.first else {
-            throw SupabaseError.noData
+        // Use flexible date decoding for Supabase responses
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // Try ISO8601 with fractional seconds (Supabase timestamptz format)
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = isoFormatter.date(from: dateString) {
+                return date
+            }
+            // Try ISO8601 without fractional seconds
+            if let date = ISO8601DateFormatter().date(from: dateString) {
+                return date
+            }
+            // Try date-only format (YYYY-MM-DD)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+            print("❌ Cannot decode date: \(dateString)")
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
         }
-        return first
+        
+        do {
+            let results = try decoder.decode([T].self, from: data)
+            guard let first = results.first else {
+                throw SupabaseError.noData
+            }
+            return first
+        } catch {
+            print("❌ Supabase decode error: \(error)")
+            throw error
+        }
     }
     
     private func get<T: Decodable>(endpoint: String) async throws -> [T] {
@@ -215,11 +303,17 @@ actor SupabaseService {
         request.httpMethod = "GET"
         headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
         
+        print("🔍 Supabase GET: \(endpoint)")
+        
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SupabaseError.invalidResponse
         }
+        
+        // Debug: Print raw response
+        let rawResponse = String(data: data, encoding: .utf8) ?? "nil"
+        print("📦 Supabase GET response (\(httpResponse.statusCode)): \(rawResponse.prefix(500))")
         
         guard (200...299).contains(httpResponse.statusCode) else {
             let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
@@ -228,9 +322,36 @@ actor SupabaseService {
         
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .iso8601
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            // Try ISO8601 with fractional seconds (Supabase timestamptz)
+            let isoFormatter = ISO8601DateFormatter()
+            isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            if let date = isoFormatter.date(from: dateString) {
+                return date
+            }
+            // Try ISO8601 without fractional seconds
+            if let date = ISO8601DateFormatter().date(from: dateString) {
+                return date
+            }
+            // Try date-only format (YYYY-MM-DD)
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd"
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+            print("❌ Cannot decode date: \(dateString)")
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
+        }
         
-        return try decoder.decode([T].self, from: data)
+        do {
+            return try decoder.decode([T].self, from: data)
+        } catch {
+            print("❌ Supabase GET decode error: \(error)")
+            throw error
+        }
     }
 }
 
@@ -327,13 +448,13 @@ struct CompatibilityCache: Codable, Identifiable {
     var id: UUID?
     let contactA: UUID
     let contactB: UUID
+    
+    // Layer 1: Overall (static)
     let baseScore: Int
     let synastryHighlights: [String]?
     let aiOutput: String? // Gemini-generated compatibility text
-    let weekStart: Date?
-    var createdAt: Date?
     
-    // "This Week" compatibility fields
+    // Layer 2: This Week (dynamic, AI-generated)
     let thisWeekScore: Int?
     let loveCompatibility: String?
     let communicationCompatibility: String?
@@ -341,6 +462,14 @@ struct CompatibilityCache: Codable, Identifiable {
     let weeklyReading: String?
     let growthAdvice: String?
     let celestialInfluence: String?
+    
+    // Layer 3: Live (future - daily or event-based)
+    let liveScore: Int?
+    let liveVibe: String?
+    let liveUpdatedAt: Date?
+    
+    let weekStart: Date?
+    var createdAt: Date?
     
     init(
         contactA: UUID,
@@ -355,7 +484,10 @@ struct CompatibilityCache: Codable, Identifiable {
         weeklyVibe: String? = nil,
         weeklyReading: String? = nil,
         growthAdvice: String? = nil,
-        celestialInfluence: String? = nil
+        celestialInfluence: String? = nil,
+        liveScore: Int? = nil,
+        liveVibe: String? = nil,
+        liveUpdatedAt: Date? = nil
     ) {
         self.contactA = contactA
         self.contactB = contactB
@@ -370,6 +502,46 @@ struct CompatibilityCache: Codable, Identifiable {
         self.weeklyReading = weeklyReading
         self.growthAdvice = growthAdvice
         self.celestialInfluence = celestialInfluence
+        self.liveScore = liveScore
+        self.liveVibe = liveVibe
+        self.liveUpdatedAt = liveUpdatedAt
+    }
+    
+    // MARK: - Live Compatibility Status
+    var liveStatus: LiveCompatibilityStatus {
+        if liveScore != nil {
+            return .available
+        }
+        return .notAvailable
+    }
+}
+
+// MARK: - Live Compatibility Status (Layer 3 placeholder)
+enum LiveCompatibilityStatus: String, Codable {
+    case notAvailable = "Not Available"
+    case loading = "Loading"
+    case available = "Available"
+    case locked = "Locked"       // Requires Full profile
+    case stale = "Stale"         // Needs refresh due to transit
+    
+    var icon: String {
+        switch self {
+        case .notAvailable: return "moon.zzz"
+        case .loading: return "arrow.triangle.2.circlepath"
+        case .available: return "waveform.path.ecg"
+        case .locked: return "lock.fill"
+        case .stale: return "exclamationmark.triangle"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .notAvailable: return "Live compatibility not yet available"
+        case .loading: return "Checking today's cosmic alignment..."
+        case .available: return "Today's connection vibe"
+        case .locked: return "Add full birth data to unlock"
+        case .stale: return "Major transit detected - refresh recommended"
+        }
     }
 }
 

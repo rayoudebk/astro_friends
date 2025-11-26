@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		3462BDD02ED788C500D92CE5 /* CompatibilityEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3462BDCE2ED788C500D92CE5 /* CompatibilityEngine.swift */; };
+		3462BDD12ED788C500D92CE5 /* ContentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3462BDCF2ED788C500D92CE5 /* ContentService.swift */; };
 		34A92CD92ED76A6500B62712 /* Secrets.template.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD22ED76A6500B62712 /* Secrets.template.swift */; };
 		34A92CDA2ED76A6500B62712 /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD52ED76A6500B62712 /* GeminiService.swift */; };
 		34A92CDB2ED76A6500B62712 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD12ED76A6500B62712 /* Secrets.swift */; };
@@ -30,6 +32,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3462BDCE2ED788C500D92CE5 /* CompatibilityEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompatibilityEngine.swift; sourceTree = "<group>"; };
+		3462BDCF2ED788C500D92CE5 /* ContentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentService.swift; sourceTree = "<group>"; };
 		34A92CD12ED76A6500B62712 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
 		34A92CD22ED76A6500B62712 /* Secrets.template.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.template.swift; sourceTree = "<group>"; };
 		34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstrologyAPIService.swift; sourceTree = "<group>"; };
@@ -77,6 +81,8 @@
 		34A92CD82ED76A6500B62712 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				3462BDCE2ED788C500D92CE5 /* CompatibilityEngine.swift */,
+				3462BDCF2ED788C500D92CE5 /* ContentService.swift */,
 				34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */,
 				34A92CD52ED76A6500B62712 /* GeminiService.swift */,
 				34A92CD62ED76A6500B62712 /* OracleManager.swift */,
@@ -221,6 +227,8 @@
 				A10000000000000000000001 /* AstroFriendsApp.swift in Sources */,
 				A10000000000000000000002 /* ContentView.swift in Sources */,
 				34A92CD92ED76A6500B62712 /* Secrets.template.swift in Sources */,
+				3462BDD02ED788C500D92CE5 /* CompatibilityEngine.swift in Sources */,
+				3462BDD12ED788C500D92CE5 /* ContentService.swift in Sources */,
 				34A92CDA2ED76A6500B62712 /* GeminiService.swift in Sources */,
 				34A92CDB2ED76A6500B62712 /* Secrets.swift in Sources */,
 				34A92CDC2ED76A6500B62712 /* AstrologyAPIService.swift in Sources */,

@@ -1,6 +1,8 @@
 import SwiftUI
 import SwiftData
 import Contacts
+import MapKit
+import CoreLocation
 
 @main
 struct AstroFriendsApp: App {
@@ -86,17 +88,52 @@ struct HomeView: View {
     @Query private var contacts: [Contact]
     @AppStorage("userZodiacSign") private var savedUserSign: String = "Aries"
     @AppStorage("userBirthday") private var userBirthdayTimestamp: Double = 0
+    @AppStorage("userBirthTime") private var userBirthTimeTimestamp: Double = 0
+    @AppStorage("userBirthPlace") private var userBirthPlace: String = ""
     @AppStorage("userName") private var userName: String = ""
+    @AppStorage("userUUID") private var userUUID: String = UUID().uuidString // Stable user ID for oracle
     @State private var showingUserSettings = false
     @State private var isReadingExpanded = false
     @State private var showingHoroscopeDetail = false
+    
+    // Tier 2 weekly horoscope state
+    @State private var weeklyHoroscope: WeeklyHoroscope?
+    @State private var isLoadingHoroscope = false
+    
+    // Tier 3 personal oracle state (for user)
+    @State private var personalOracle: OracleContent?
+    @State private var isLoadingPersonalOracle = false
+    @State private var personalOracleError: String?
     
     var userSign: ZodiacSign {
         ZodiacSign(rawValue: savedUserSign) ?? .aries
     }
     
-    var horoscope: Horoscope {
+    // Fallback to static if Tier 2 not loaded
+    var staticHoroscope: Horoscope {
         Horoscope.getWeeklyHoroscope(for: userSign)
+    }
+    
+    // Display values: Tier 2 → Tier 1 fallback
+    var displayReading: String {
+        weeklyHoroscope?.weeklyReading ?? staticHoroscope.weeklyReading
+    }
+    
+    var displayMood: String {
+        weeklyHoroscope?.mood ?? staticHoroscope.mood
+    }
+    
+    var isAIGenerated: Bool {
+        weeklyHoroscope?.isAIGenerated ?? false
+    }
+    
+    // Check if user has enough data for Tier 3
+    var canAccessTier3: Bool {
+        userBirthdayTimestamp > 0 // At minimum needs birthday
+    }
+    
+    var hasFullBirthData: Bool {
+        userBirthdayTimestamp > 0 && userBirthTimeTimestamp > 0 && !userBirthPlace.isEmpty
     }
     
     var greeting: String {
@@ -141,6 +178,11 @@ struct HomeView: View {
                 VStack(spacing: 20) {
                     headerView
                     weeklyReadingCard
+                    
+                    // Tier 3: Your Personal Oracle
+                    if canAccessTier3 {
+                        personalOracleCard
+                    }
                     
                     if !contacts.isEmpty {
                         compatibilitySection
@@ -187,8 +229,87 @@ struct HomeView: View {
             .sheet(isPresented: $showingHoroscopeDetail) {
                 HoroscopeDetailView(sign: userSign)
             }
+            .task {
+                await loadWeeklyHoroscope()
+                if canAccessTier3 {
+                    await loadPersonalOracle()
+                }
+            }
+            .onChange(of: savedUserSign) { _, _ in
+                Task {
+                    await loadWeeklyHoroscope()
+                    if canAccessTier3 {
+                        await loadPersonalOracle()
+                    }
+                }
+            }
         }
         .preferredColorScheme(.dark)
+    }
+    
+    // MARK: - Load Tier 2 Weekly Horoscope
+    private func loadWeeklyHoroscope() async {
+        isLoadingHoroscope = true
+        weeklyHoroscope = await ContentService.shared.getWeeklyHoroscope(for: userSign)
+        isLoadingHoroscope = false
+    }
+    
+    // MARK: - Load Tier 3 Personal Oracle
+    
+    // Helper to create a stable user Contact for oracle generation
+    private func createUserContact() -> Contact {
+        let contact = Contact(
+            name: userName.isEmpty ? "You" : userName,
+            zodiacSign: userSign,
+            birthday: userBirthdayTimestamp > 0 ? Date(timeIntervalSince1970: userBirthdayTimestamp) : nil,
+            birthTime: userBirthTimeTimestamp > 0 ? Date(timeIntervalSince1970: userBirthTimeTimestamp) : nil,
+            birthPlace: userBirthPlace.isEmpty ? nil : userBirthPlace
+        )
+        // Use stable UUID so caching works
+        if let stableId = UUID(uuidString: userUUID) {
+            contact.id = stableId
+        }
+        return contact
+    }
+    
+    private func loadPersonalOracle() async {
+        guard canAccessTier3 else { return }
+        
+        isLoadingPersonalOracle = true
+        personalOracleError = nil
+        
+        let userContact = createUserContact()
+        
+        // Check for cached content first
+        if let cached = try? await SupabaseService.shared.fetchOracleContent(contactId: userContact.id) {
+            personalOracle = cached
+        } else {
+            // Generate fresh
+            do {
+                personalOracle = try await OracleManager.shared.generateOracleContent(for: userContact)
+            } catch {
+                personalOracleError = error.localizedDescription
+            }
+        }
+        
+        isLoadingPersonalOracle = false
+    }
+    
+    private func refreshPersonalOracle() async {
+        guard canAccessTier3 else { return }
+        
+        isLoadingPersonalOracle = true
+        personalOracleError = nil
+        
+        let userContact = createUserContact()
+        
+        do {
+            personalOracle = try await OracleManager.shared.generateOracleContent(for: userContact)
+        } catch {
+            personalOracleError = error.localizedDescription
+        }
+        
+        isLoadingPersonalOracle = false
     }
     
     
@@ -238,7 +359,13 @@ struct HomeView: View {
                     Spacer()
                     
                     HStack(spacing: 4) {
-                        Text(horoscope.mood)
+                        if isAIGenerated {
+                            Image(systemName: "sparkles")
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
+                        }
+                        
+                        Text(displayMood)
                             .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
@@ -252,7 +379,7 @@ struct HomeView: View {
                     }
                 }
                 
-                Text(horoscope.weeklyReading)
+                Text(displayReading)
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.8))
                     .lineLimit(3)
@@ -285,6 +412,178 @@ struct HomeView: View {
             .cornerRadius(20)
         }
         .buttonStyle(.plain)
+    }
+    
+    // MARK: - Tier 3 Personal Oracle Card
+    private var personalOracleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.yellow, .orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 6) {
+                        Text("Your Personal Oracle")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        Text("TIER 3")
+                            .font(.caption2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.yellow)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.yellow.opacity(0.2))
+                            .cornerRadius(4)
+                    }
+                    
+                    if hasFullBirthData {
+                        Text("Full natal chart reading")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    } else {
+                        Text("Add birth time & place for deeper insights")
+                            .font(.caption)
+                            .foregroundColor(.orange.opacity(0.8))
+                    }
+                }
+                
+                Spacer()
+                
+                if personalOracle != nil {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                }
+            }
+            
+            // Content
+            if isLoadingPersonalOracle && personalOracle == nil {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(.yellow.opacity(0.8))
+                        .scaleEffect(0.8)
+                    Text("Consulting the celestial oracle...")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.6))
+                        .italic()
+                }
+                .padding(.vertical, 8)
+            } else if let oracle = personalOracle {
+                Text(oracle.weeklyReading)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.85))
+                    .fixedSize(horizontal: false, vertical: true)
+                
+                // Personal details row
+                HStack(spacing: 16) {
+                    if let lucky = oracle.luckyNumber {
+                        VStack(spacing: 2) {
+                            Text("\(lucky)")
+                                .font(.headline)
+                                .foregroundColor(.yellow)
+                            Text("Lucky #")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                    
+                    if let color = oracle.luckyColor {
+                        VStack(spacing: 2) {
+                            Text(color)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.purple)
+                            Text("Color")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                    
+                    if let mood = oracle.mood {
+                        VStack(spacing: 2) {
+                            Text(mood)
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(.cyan)
+                            Text("Vibe")
+                                .font(.caption2)
+                                .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(.top, 4)
+                
+                // Celestial insight
+                if let insight = oracle.celestialInsight {
+                    Text("✨ \(insight)")
+                        .font(.caption)
+                        .italic()
+                        .foregroundColor(.white.opacity(0.7))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 6)
+                }
+            } else if let error = personalOracleError {
+                VStack(spacing: 8) {
+                    Text(error)
+                        .font(.caption)
+                        .foregroundColor(.red.opacity(0.8))
+                    
+                    Button {
+                        Task { await refreshPersonalOracle() }
+                    } label: {
+                        Text("Retry")
+                            .font(.caption)
+                            .foregroundColor(.yellow)
+                    }
+                }
+            } else {
+                // Generate button
+                Button {
+                    Task { await loadPersonalOracle() }
+                } label: {
+                    HStack {
+                        Image(systemName: "wand.and.stars")
+                        Text("Generate Your Oracle Reading")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.yellow)
+                    .padding(.vertical, 8)
+                }
+            }
+            
+            // Refresh button
+            if personalOracle != nil && !isLoadingPersonalOracle {
+                Button {
+                    Task { await refreshPersonalOracle() }
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh Oracle")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
+                }
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.yellow.opacity(0.15), Color.orange.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(20)
     }
     
     private var compatibilitySection: some View {
@@ -455,14 +754,22 @@ struct UserProfileSheet: View {
     let userSign: ZodiacSign
     @AppStorage("userZodiacSign") private var savedUserSign: String = "Aries"
     @AppStorage("userBirthday") private var userBirthdayTimestamp: Double = 0
+    @AppStorage("userBirthTime") private var userBirthTimeTimestamp: Double = 0
+    @AppStorage("userBirthPlace") private var savedBirthPlace: String = ""
     @AppStorage("userName") private var userName: String = ""
     
     @State private var selectedSign: ZodiacSign = .aries
     @State private var hasBirthday = false
     @State private var birthday = Date()
+    @State private var hasBirthTime = false
+    @State private var birthTime = Date()
+    @State private var birthPlace = ""
+    @State private var coordinates: CLLocationCoordinate2D? = nil
     @State private var name = ""
     @State private var showingContactPicker = false
+    @State private var showingLocationSearch = false
     
+    @StateObject private var locationCompleter = LocationSearchCompleter()
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
@@ -504,7 +811,7 @@ struct UserProfileSheet: View {
                     }
                 }
                 
-                Section("Birthday") {
+                Section {
                     Toggle("I know my birthday", isOn: $hasBirthday)
                     if hasBirthday {
                         DatePicker("Birthday", selection: $birthday, displayedComponents: .date)
@@ -512,6 +819,66 @@ struct UserProfileSheet: View {
                                 selectedSign = ZodiacSign.from(birthday: newDate)
                             }
                     }
+                } header: {
+                    Text("Birthday")
+                }
+                
+                Section {
+                    Toggle("I know my birth time", isOn: $hasBirthTime)
+                    if hasBirthTime {
+                        DatePicker("Birth Time", selection: $birthTime, displayedComponents: .hourAndMinute)
+                    }
+                    
+                    // Birth Place with search
+                    Button {
+                        showingLocationSearch = true
+                    } label: {
+                        HStack {
+                            Text("Birth City")
+                                .foregroundColor(.primary)
+                            Spacer()
+                            if birthPlace.isEmpty {
+                                Text("Search...")
+                                    .foregroundColor(.secondary)
+                            } else {
+                                Text(birthPlace)
+                                    .foregroundColor(.purple)
+                                    .lineLimit(1)
+                            }
+                            Image(systemName: "magnifyingglass")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    
+                    if let coords = coordinates {
+                        HStack {
+                            Image(systemName: "location.fill")
+                                .foregroundColor(.purple)
+                                .font(.caption)
+                            Text(formatCoordinates(coords))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            
+                            Spacer()
+                            
+                            if !birthPlace.isEmpty {
+                                Button {
+                                    birthPlace = ""
+                                    coordinates = nil
+                                } label: {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .foregroundColor(.secondary)
+                                        .font(.caption)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Advanced (Optional)")
+                } footer: {
+                    Text("Adding birth time and place enables Moon & Rising sign for deeper readings.")
                 }
             }
             .navigationTitle("Your Profile")
@@ -524,6 +891,8 @@ struct UserProfileSheet: View {
                     Button("Save") {
                         savedUserSign = selectedSign.rawValue
                         userBirthdayTimestamp = hasBirthday ? birthday.timeIntervalSince1970 : 0
+                        userBirthTimeTimestamp = hasBirthTime ? birthTime.timeIntervalSince1970 : 0
+                        savedBirthPlace = birthPlace
                         userName = name
                         dismiss()
                     }
@@ -532,9 +901,17 @@ struct UserProfileSheet: View {
             .onAppear {
                 selectedSign = userSign
                 name = userName
+                birthPlace = savedBirthPlace
                 if userBirthdayTimestamp > 0 {
                     hasBirthday = true
                     birthday = Date(timeIntervalSince1970: userBirthdayTimestamp)
+                }
+                if userBirthTimeTimestamp > 0 {
+                    hasBirthTime = true
+                    birthTime = Date(timeIntervalSince1970: userBirthTimeTimestamp)
+                }
+                if !birthPlace.isEmpty {
+                    geocodeExistingPlace(birthPlace)
                 }
             }
             .sheet(isPresented: $showingContactPicker) {
@@ -548,7 +925,31 @@ struct UserProfileSheet: View {
                     name = importedName
                 }
             }
+            .sheet(isPresented: $showingLocationSearch) {
+                LocationSearchView(
+                    selectedPlace: $birthPlace,
+                    coordinates: $coordinates,
+                    completer: locationCompleter
+                )
+            }
         }
+    }
+    
+    private func geocodeExistingPlace(_ place: String) {
+        let geocoder = CLGeocoder()
+        geocoder.geocodeAddressString(place) { placemarks, _ in
+            if let location = placemarks?.first?.location {
+                self.coordinates = location.coordinate
+            }
+        }
+    }
+    
+    private func formatCoordinates(_ coord: CLLocationCoordinate2D) -> String {
+        let latDirection = coord.latitude >= 0 ? "N" : "S"
+        let lonDirection = coord.longitude >= 0 ? "E" : "W"
+        return String(format: "%.4f° %@, %.4f° %@",
+                      abs(coord.latitude), latDirection,
+                      abs(coord.longitude), lonDirection)
     }
 }
 

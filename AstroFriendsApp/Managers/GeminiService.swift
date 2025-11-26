@@ -49,6 +49,19 @@ actor GeminiService {
         return try parseCompatibilityResponse(response)
     }
     
+    // MARK: - Generate Weekly Sign Horoscope (Tier 2)
+    /// Creates a weekly horoscope for a specific zodiac sign
+    /// This is the SAME for all users of that sign (Tier 2 content)
+    func generateWeeklySignHoroscope(
+        sign: ZodiacSign,
+        weeklySky: WeeklySky?
+    ) async throws -> GeneratedSignHoroscope {
+        
+        let prompt = buildWeeklySignHoroscopePrompt(sign: sign, weeklySky: weeklySky)
+        let response = try await callGemini(prompt: prompt)
+        return try parseSignHoroscopeResponse(response)
+    }
+    
     // MARK: - Generate "This Week" Compatibility
     /// Creates a weekly compatibility reading that factors in current sky conditions and moods
     func generateWeeklyCompatibility(
@@ -124,6 +137,48 @@ actor GeminiService {
         
         Make the reading feel personal, mystical, and specific to their chart. Avoid generic advice.
         Use poetic but accessible language. Reference celestial bodies and cosmic energy.
+        """
+    }
+    
+    private func buildWeeklySignHoroscopePrompt(sign: ZodiacSign, weeklySky: WeeklySky?) -> String {
+        var skyContext = ""
+        if let sky = weeklySky {
+            skyContext = """
+            
+            CURRENT CELESTIAL CONTEXT:
+            - Moon Phase: \(sky.moonPhase)
+            - Moon Sign: \(sky.moonSign ?? "unknown")
+            - Notable Transits: \(sky.transits?.joined(separator: ", ") ?? "none specified")
+            """
+        }
+        
+        return """
+        You are a mystical astrology oracle. Generate a weekly horoscope for ALL \(sign.rawValue) people.
+        This is a GENERAL horoscope that applies to everyone born under \(sign.rawValue).
+        
+        SIGN INFORMATION:
+        - Sun Sign: \(sign.rawValue)
+        - Element: \(sign.element)
+        - Modality: \(sign.modality.rawValue)
+        - Ruling Traits: \(sign.keyTraits)
+        \(skyContext)
+        
+        Generate a JSON response with this EXACT structure (no markdown, just raw JSON):
+        {
+            "weeklyReading": "A 3-4 sentence weekly reading that applies to ALL \(sign.rawValue) people. Reference the sign's traits and current transits. Be mystical but applicable to everyone of this sign.",
+            "mood": "<one word describing \(sign.rawValue)'s energy this week - THIS IS THE AUTHORITATIVE MOOD>",
+            "luckyNumber": <a number between 1-99>,
+            "luckyColor": "<a color name that resonates with \(sign.rawValue) this week>",
+            "loveForecast": "2 sentences about love/relationships for \(sign.rawValue) this week.",
+            "careerForecast": "2 sentences about career/work for \(sign.rawValue) this week.",
+            "healthTip": "One sentence wellness tip for \(sign.rawValue) this week.",
+            "powerDay": "<day of the week when \(sign.rawValue) will feel most empowered>",
+            "challengeDay": "<day of the week that may be challenging for \(sign.rawValue)>",
+            "affirmation": "A short affirmation for \(sign.rawValue) to carry this week."
+        }
+        
+        Important: This horoscope should feel relevant to ALL people of this sign, not personalized.
+        Use "you" and "your" but keep it general. Reference the sign's element and traits.
         """
     }
     
@@ -319,25 +374,72 @@ actor GeminiService {
         
         do {
             let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
             return try decoder.decode(GeneratedOracleContent.self, from: data)
         } catch {
             print("❌ JSON Decode error: \(error)")
-            throw GeminiError.parsingError
+            throw error
         }
     }
     
-    private func parseCompatibilityResponse(_ response: String) throws -> GeneratedCompatibility {
-        let cleanedResponse = response
+    private func parseSignHoroscopeResponse(_ response: String) throws -> GeneratedSignHoroscope {
+        var cleanedResponse = response
             .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```JSON", with: "")
             .replacingOccurrences(of: "```", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if let jsonStart = cleanedResponse.firstIndex(of: "{"),
+           let jsonEnd = cleanedResponse.lastIndex(of: "}") {
+            cleanedResponse = String(cleanedResponse[jsonStart...jsonEnd])
+        }
+        
+        print("🔮 Sign Horoscope raw: \(response.prefix(200))")
+        print("🔮 Sign Horoscope cleaned: \(cleanedResponse.prefix(200))")
         
         guard let data = cleanedResponse.data(using: .utf8) else {
             throw GeminiError.parsingError
         }
         
         let decoder = JSONDecoder()
-        return try decoder.decode(GeneratedCompatibility.self, from: data)
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        
+        do {
+            return try decoder.decode(GeneratedSignHoroscope.self, from: data)
+        } catch {
+            print("❌ Sign Horoscope decode error: \(error)")
+            throw error
+        }
+    }
+    
+    private func parseCompatibilityResponse(_ response: String) throws -> GeneratedCompatibility {
+        var cleanedResponse = response
+            .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```JSON", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        if let jsonStart = cleanedResponse.firstIndex(of: "{"),
+           let jsonEnd = cleanedResponse.lastIndex(of: "}") {
+            cleanedResponse = String(cleanedResponse[jsonStart...jsonEnd])
+        }
+        
+        print("🔮 Compatibility raw: \(response.prefix(200))")
+        print("🔮 Compatibility cleaned: \(cleanedResponse.prefix(200))")
+        
+        guard let data = cleanedResponse.data(using: .utf8) else {
+            throw GeminiError.parsingError
+        }
+        
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        
+        do {
+            return try decoder.decode(GeneratedCompatibility.self, from: data)
+        } catch {
+            print("❌ Compatibility decode error: \(error)")
+            throw error
+        }
     }
     
     private func parseWeeklyCompatibilityResponse(_ response: String) throws -> GeneratedWeeklyCompatibility {
@@ -353,12 +455,22 @@ actor GeminiService {
             cleanedResponse = String(cleanedResponse[jsonStart...jsonEnd])
         }
         
+        print("🔮 Weekly Compatibility raw: \(response.prefix(200))")
+        print("🔮 Weekly Compatibility cleaned: \(cleanedResponse.prefix(200))")
+        
         guard let data = cleanedResponse.data(using: .utf8) else {
             throw GeminiError.parsingError
         }
         
         let decoder = JSONDecoder()
-        return try decoder.decode(GeneratedWeeklyCompatibility.self, from: data)
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        
+        do {
+            return try decoder.decode(GeneratedWeeklyCompatibility.self, from: data)
+        } catch {
+            print("❌ Weekly Compatibility decode error: \(error)")
+            throw error
+        }
     }
 }
 
@@ -489,6 +601,68 @@ struct GeneratedWeeklyCompatibility: Codable {
     
     var influence: String? {
         celestialInfluence ?? celestial_influence
+    }
+}
+
+// MARK: - Tier 2 Sign Horoscope (same for all users of a sign)
+
+struct GeneratedSignHoroscope: Codable {
+    let weeklyReading: String?
+    let mood: String?
+    let luckyNumber: Int?
+    let luckyColor: String?
+    let loveForecast: String?
+    let careerForecast: String?
+    let healthTip: String?
+    let powerDay: String?
+    let challengeDay: String?
+    let affirmation: String?
+    
+    // Snake case alternatives
+    let weekly_reading: String?
+    let lucky_number: Int?
+    let lucky_color: String?
+    let love_forecast: String?
+    let career_forecast: String?
+    let health_tip: String?
+    let power_day: String?
+    let challenge_day: String?
+    
+    // Computed properties
+    var reading: String {
+        weeklyReading ?? weekly_reading ?? "The cosmos align for your sign this week."
+    }
+    
+    var signMood: String {
+        mood ?? "Balanced"
+    }
+    
+    var number: Int {
+        luckyNumber ?? lucky_number ?? Int.random(in: 1...99)
+    }
+    
+    var color: String {
+        luckyColor ?? lucky_color ?? "Purple"
+    }
+    
+    var love: String? {
+        loveForecast ?? love_forecast
+    }
+    
+    var career: String? {
+        careerForecast ?? career_forecast
+    }
+    
+    var health: String? {
+        healthTip ?? health_tip
+    }
+    
+    var bestDay: String? {
+        powerDay ?? power_day
+    }
+    
+    var hardDay: String? {
+        challengeDay ?? challenge_day
     }
 }
 
