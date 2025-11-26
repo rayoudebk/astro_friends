@@ -237,12 +237,20 @@ struct HoroscopeCardView: View {
         Horoscope.getWeeklyHoroscope(for: currentSign)
     }
     
+    var moonPhase: MoonPhase {
+        Horoscope.currentMoonPhase
+    }
+    
+    var moonSign: MoonSign {
+        Horoscope.currentMoonSign
+    }
+    
     var body: some View {
         Button {
             onSignTap(currentSign)
         } label: {
             VStack(alignment: .leading, spacing: 12) {
-                // Header
+                // Header with Moon Phase
                 HStack {
                     Text("Weekly Horoscope")
                         .font(.caption)
@@ -251,14 +259,18 @@ struct HoroscopeCardView: View {
                     
                     Spacer()
                     
-                    // Sign indicator dots
+                    // Moon phase indicator
                     HStack(spacing: 4) {
-                        ForEach(0..<12, id: \.self) { index in
-                            Circle()
-                                .fill(index == currentSignIndex ? Color.white : Color.white.opacity(0.3))
-                                .frame(width: 6, height: 6)
-                        }
+                        Text(moonPhase.emoji)
+                            .font(.caption)
+                        Text(moonPhase.rawValue)
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.7))
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.white.opacity(0.15))
+                    .cornerRadius(8)
                 }
                 
                 // Sign info
@@ -294,16 +306,35 @@ struct HoroscopeCardView: View {
                     }
                 }
                 
+                // Celestial context line
+                Text("Moon in \(moonSign.rawValue) · \(moonSign.emotionalFlavor.capitalized)")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.8))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(8)
+                
                 // Reading preview
                 Text(horoscope.weeklyReading)
                     .font(.subheadline)
                     .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(3)
+                    .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 
                 // Tap to read more
                 HStack {
+                    // Sign indicator dots
+                    HStack(spacing: 4) {
+                        ForEach(0..<12, id: \.self) { index in
+                            Circle()
+                                .fill(index == currentSignIndex ? Color.white : Color.white.opacity(0.3))
+                                .frame(width: 5, height: 5)
+                        }
+                    }
+                    
                     Spacer()
+                    
                     Text("Tap to read more")
                         .font(.caption2)
                         .foregroundColor(.white.opacity(0.6))
@@ -351,6 +382,18 @@ struct HoroscopeDetailView: View {
         Horoscope.getWeeklyHoroscope(for: sign)
     }
     
+    var moonPhase: MoonPhase {
+        Horoscope.currentMoonPhase
+    }
+    
+    var moonSign: MoonSign {
+        Horoscope.currentMoonSign
+    }
+    
+    var transits: [PlanetaryTransit] {
+        Horoscope.currentTransits
+    }
+    
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -382,6 +425,106 @@ struct HoroscopeDetailView: View {
                     }
                     .padding(.bottom, 8)
                     
+                    // Celestial Overview Card
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Celestial Influences")
+                                .font(.headline)
+                            Spacer()
+                            Text(moonPhase.emoji)
+                                .font(.title2)
+                        }
+                        
+                        // Moon Phase & Sign
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Moon Phase")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(moonPhase.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Moon in")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(moonSign.rawValue)
+                                    .font(.subheadline)
+                                    .fontWeight(.medium)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        
+                        Divider()
+                        
+                        // Emotional Tone
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Emotional Tone")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Text("You may feel \(moonSign.emotionalFlavor) and \(moonPhase.emotionalTone).")
+                                .font(.subheadline)
+                                .foregroundColor(.primary)
+                        }
+                        
+                        Divider()
+                        
+                        // Celestial Insight
+                        Text(Horoscope.celestialMessage(for: sign))
+                            .font(.subheadline)
+                            .foregroundColor(.primary)
+                            .italic()
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        LinearGradient(
+                            colors: [Color.indigo.opacity(0.15), Color.purple.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
+                    
+                    // Planetary Transits
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Planetary Transits")
+                            .font(.headline)
+                        
+                        ForEach(transits.indices, id: \.self) { index in
+                            let transit = transits[index]
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack {
+                                    Text(transit.emoji)
+                                        .font(.title3)
+                                    Text("\(transit.planet) \(transit.aspect)")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                }
+                                
+                                Text(transit.description)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                Text("💡 \(transit.advice)")
+                                    .font(.caption)
+                                    .foregroundColor(.primary)
+                                    .padding(.top, 2)
+                            }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color(UIColor.tertiarySystemBackground))
+                            .cornerRadius(12)
+                        }
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(UIColor.secondarySystemBackground))
+                    .cornerRadius(16)
+                    
                     // Weekly Reading
                     VStack(alignment: .leading, spacing: 8) {
                         Text("This Week's Reading")
@@ -390,6 +533,19 @@ struct HoroscopeDetailView: View {
                         Text(horoscope.weeklyReading)
                             .font(.body)
                             .foregroundColor(.secondary)
+                        
+                        if !horoscope.celestialInsight.isEmpty {
+                            Divider()
+                                .padding(.vertical, 4)
+                            
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("✨")
+                                Text(horoscope.celestialInsight)
+                                    .font(.subheadline)
+                                    .foregroundColor(.primary)
+                                    .italic()
+                            }
+                        }
                     }
                     .padding()
                     .frame(maxWidth: .infinity, alignment: .leading)

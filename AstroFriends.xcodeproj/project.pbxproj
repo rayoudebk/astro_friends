@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		8FB3E3F52ED607B200DDDCC5 /* AstralCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */; };
+		8FB3E3F72ED607C400DDDCC5 /* CompatibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */; };
+		8FFD09AE2ED60DBF0007B015 /* NatalChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */; };
 		A10000000000000000000001 /* AstroFriendsApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* AstroFriendsApp.swift */; };
 		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ContentView.swift */; };
 		A10000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* Assets.xcassets */; };
@@ -23,6 +26,9 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AstralCompatibility.swift; sourceTree = "<group>"; };
+		8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CompatibilityView.swift; sourceTree = "<group>"; };
+		8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NatalChart.swift; sourceTree = "<group>"; };
 		A10000000000000000000010 /* AstroFriends.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AstroFriends.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000011 /* AstroFriendsApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstroFriendsApp.swift; sourceTree = "<group>"; };
 		A10000000000000000000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -75,6 +81,8 @@
 		A10000000000000000000032 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */,
+				8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */,
 				A10000000000000000000014 /* Contact.swift */,
 				A10000000000000000000015 /* CheckIn.swift */,
 				A10000000000000000000016 /* Horoscope.swift */,
@@ -85,6 +93,7 @@
 		A10000000000000000000033 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */,
 				A10000000000000000000017 /* AddContactView.swift */,
 				A10000000000000000000018 /* ContactDetailView.swift */,
 				A10000000000000000000019 /* EditContactView.swift */,
@@ -184,13 +193,16 @@
 				A10000000000000000000001 /* AstroFriendsApp.swift in Sources */,
 				A10000000000000000000002 /* ContentView.swift in Sources */,
 				A10000000000000000000004 /* Contact.swift in Sources */,
+				8FB3E3F72ED607C400DDDCC5 /* CompatibilityView.swift in Sources */,
 				A10000000000000000000005 /* CheckIn.swift in Sources */,
 				A10000000000000000000006 /* Horoscope.swift in Sources */,
 				A10000000000000000000007 /* AddContactView.swift in Sources */,
 				A10000000000000000000008 /* ContactDetailView.swift in Sources */,
 				A10000000000000000000009 /* EditContactView.swift in Sources */,
+				8FFD09AE2ED60DBF0007B015 /* NatalChart.swift in Sources */,
 				A1000000000000000000000A /* CheckInSheetView.swift in Sources */,
 				A1000000000000000000000B /* SettingsView.swift in Sources */,
+				8FB3E3F52ED607B200DDDCC5 /* AstralCompatibility.swift in Sources */,
 				A1000000000000000000000C /* ContactRowView.swift in Sources */,
 				A1000000000000000000000D /* EmptyStateView.swift in Sources */,
 			);
@@ -399,4 +411,3 @@
 	};
 	rootObject = A10000000000000000000060 /* Project object */;
 }
-
