@@ -332,6 +332,45 @@ struct CompatibilityCache: Codable, Identifiable {
     let aiOutput: String? // Gemini-generated compatibility text
     let weekStart: Date?
     var createdAt: Date?
+    
+    // "This Week" compatibility fields
+    let thisWeekScore: Int?
+    let loveCompatibility: String?
+    let communicationCompatibility: String?
+    let weeklyVibe: String?
+    let weeklyReading: String?
+    let growthAdvice: String?
+    let celestialInfluence: String?
+    
+    init(
+        contactA: UUID,
+        contactB: UUID,
+        baseScore: Int,
+        synastryHighlights: [String]? = nil,
+        aiOutput: String? = nil,
+        weekStart: Date? = nil,
+        thisWeekScore: Int? = nil,
+        loveCompatibility: String? = nil,
+        communicationCompatibility: String? = nil,
+        weeklyVibe: String? = nil,
+        weeklyReading: String? = nil,
+        growthAdvice: String? = nil,
+        celestialInfluence: String? = nil
+    ) {
+        self.contactA = contactA
+        self.contactB = contactB
+        self.baseScore = baseScore
+        self.synastryHighlights = synastryHighlights
+        self.aiOutput = aiOutput
+        self.weekStart = weekStart
+        self.thisWeekScore = thisWeekScore
+        self.loveCompatibility = loveCompatibility
+        self.communicationCompatibility = communicationCompatibility
+        self.weeklyVibe = weeklyVibe
+        self.weeklyReading = weeklyReading
+        self.growthAdvice = growthAdvice
+        self.celestialInfluence = celestialInfluence
+    }
 }
 
 // MARK: - Element & Modality Helpers

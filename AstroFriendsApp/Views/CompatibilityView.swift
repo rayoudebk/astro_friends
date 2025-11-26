@@ -12,6 +12,19 @@ struct CompatibilityView: View {
     @State private var showingUserBirthSettings = false
     @Environment(\.dismiss) private var dismiss
     
+    // "This Week" compatibility state
+    @State private var selectedTab: CompatibilityTab = .overall
+    @State private var weeklyCompatibility: CompatibilityCache?
+    @State private var isLoadingWeekly = false
+    @State private var weeklyError: String?
+    @State private var userOracleContent: OracleContent?
+    @State private var contactOracleContent: OracleContent?
+    
+    enum CompatibilityTab: String, CaseIterable {
+        case overall = "Overall"
+        case thisWeek = "This Week"
+    }
+    
     // User's natal chart
     var userNatalChart: NatalChart? {
         guard userBirthdayTimestamp > 0 else { return nil }
@@ -42,39 +55,18 @@ struct CompatibilityView: View {
                     // Header with both signs
                     headerView
                     
+                    // Tab selector (Overall vs This Week)
+                    compatibilityTabSelector
+                    
                     // Chart completeness indicator
                     chartCompletenessView
                     
-                    // Harmony Score
-                    harmonyScoreView
-                    
-                    // Poetic Summary
-                    poeticSummaryView
-                    
-                    // Oracle Reading (Sun Sign)
-                    oracleReadingView
-                    
-                    // Moon Compatibility (if available)
-                    if compatibility.hasDeepCompatibility {
-                        moonCompatibilityView
+                    // Content based on selected tab
+                    if selectedTab == .overall {
+                        overallCompatibilityContent
+                    } else {
+                        thisWeekCompatibilityContent
                     }
-                    
-                    // Rising Compatibility (if available)
-                    if compatibility.hasRisingData {
-                        risingCompatibilityView
-                    }
-                    
-                    // Elemental & Modality Dynamic
-                    dynamicsView
-                    
-                    // Strengths
-                    strengthsView
-                    
-                    // Growth Opportunities
-                    growthView
-                    
-                    // Nurturing Advice
-                    nurturingAdviceView
                 }
                 .padding()
             }
@@ -113,6 +105,498 @@ struct CompatibilityView: View {
             }
         }
         .preferredColorScheme(.dark)
+    }
+    
+    // MARK: - Tab Selector
+    private var compatibilityTabSelector: some View {
+        HStack(spacing: 0) {
+            ForEach(CompatibilityTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    VStack(spacing: 4) {
+                        HStack(spacing: 4) {
+                            Text(tab.rawValue)
+                                .font(.subheadline)
+                                .fontWeight(selectedTab == tab ? .semibold : .regular)
+                            
+                            if tab == .thisWeek {
+                                if canAccessThisWeek {
+                                    Image(systemName: "sparkles")
+                                        .font(.caption2)
+                                } else {
+                                    Image(systemName: "lock.fill")
+                                        .font(.caption2)
+                                        .foregroundColor(.orange)
+                                }
+                            }
+                        }
+                        
+                        Rectangle()
+                            .fill(selectedTab == tab ? Color.purple : Color.clear)
+                            .frame(height: 2)
+                    }
+                }
+                .foregroundColor(selectedTab == tab ? .white : .white.opacity(0.5))
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+    }
+    
+    /// Whether user can access "This Week" compatibility (requires extended data)
+    private var canAccessThisWeek: Bool {
+        // Need at least extended data on both sides
+        let userHasData = userBirthdayTimestamp > 0
+        let contactHasData = contact.astroCompletionLevel != .none
+        return userHasData && contactHasData
+    }
+    
+    // MARK: - Overall Compatibility Content
+    private var overallCompatibilityContent: some View {
+        VStack(spacing: 24) {
+            // Harmony Score
+            harmonyScoreView
+            
+            // Poetic Summary
+            poeticSummaryView
+            
+            // Oracle Reading (Sun Sign)
+            oracleReadingView
+            
+            // Moon Compatibility (if available)
+            if compatibility.hasDeepCompatibility {
+                moonCompatibilityView
+            }
+            
+            // Rising Compatibility (if available)
+            if compatibility.hasRisingData {
+                risingCompatibilityView
+            }
+            
+            // Elemental & Modality Dynamic
+            dynamicsView
+            
+            // Strengths
+            strengthsView
+            
+            // Growth Opportunities
+            growthView
+            
+            // Nurturing Advice
+            nurturingAdviceView
+        }
+    }
+    
+    // MARK: - This Week Compatibility Content
+    private var thisWeekCompatibilityContent: some View {
+        VStack(spacing: 24) {
+            if !canAccessThisWeek {
+                // Locked state
+                lockedThisWeekView
+            } else if isLoadingWeekly {
+                // Loading state
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .tint(.purple)
+                    Text("Reading the celestial currents...")
+                        .font(.subheadline)
+                        .foregroundColor(.white.opacity(0.6))
+                        .italic()
+                }
+                .padding(40)
+            } else if let weekly = weeklyCompatibility {
+                // Show "This Week" content
+                thisWeekScoreView(weekly: weekly)
+                thisWeekDetailsView(weekly: weekly)
+                thisWeekAdviceView(weekly: weekly)
+            } else {
+                // Generate button
+                generateThisWeekView
+            }
+        }
+        .task {
+            if selectedTab == .thisWeek && canAccessThisWeek && weeklyCompatibility == nil {
+                await loadThisWeekCompatibility()
+            }
+        }
+        .onChange(of: selectedTab) { _, newTab in
+            if newTab == .thisWeek && canAccessThisWeek && weeklyCompatibility == nil {
+                Task {
+                    await loadThisWeekCompatibility()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Locked This Week View
+    private var lockedThisWeekView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "lock.circle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.orange, .yellow],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            Text("This Week Compatibility")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            Text("Unlock weekly compatibility insights by adding more birth data")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+            
+            // What's needed
+            VStack(alignment: .leading, spacing: 8) {
+                if userBirthdayTimestamp == 0 {
+                    HStack {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundColor(.orange)
+                        Text("Add your birthday")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+                
+                if contact.birthday == nil {
+                    HStack {
+                        Image(systemName: "exclamationmark.circle")
+                            .foregroundColor(.orange)
+                        Text("Add \(contact.name.components(separatedBy: " ").first ?? contact.name)'s birthday")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                }
+            }
+            .padding()
+            .background(Color.orange.opacity(0.1))
+            .cornerRadius(12)
+            
+            Button {
+                showingUserBirthSettings = true
+            } label: {
+                Text("Complete Your Profile")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 24)
+                    .padding(.vertical, 12)
+                    .background(Color.purple)
+                    .cornerRadius(20)
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(20)
+    }
+    
+    // MARK: - Generate This Week View
+    private var generateThisWeekView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 40))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .pink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+            
+            Text("Discover This Week's Connection")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            Text("See how current celestial energies affect your compatibility this week")
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.7))
+                .multilineTextAlignment(.center)
+            
+            Button {
+                Task {
+                    await loadThisWeekCompatibility()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "wand.and.stars")
+                    Text("Generate This Week's Reading")
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 12)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .indigo],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(20)
+            }
+            
+            if let error = weeklyError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red.opacity(0.8))
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(20)
+    }
+    
+    // MARK: - This Week Score View
+    private func thisWeekScoreView(weekly: CompatibilityCache) -> some View {
+        VStack(spacing: 12) {
+            // Score circle
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.1), lineWidth: 8)
+                    .frame(width: 100, height: 100)
+                
+                Circle()
+                    .trim(from: 0, to: CGFloat(weekly.thisWeekScore ?? compatibility.harmonyScore) / 100)
+                    .stroke(
+                        LinearGradient(
+                            colors: [.purple, .pink, .orange],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                    )
+                    .frame(width: 100, height: 100)
+                    .rotationEffect(.degrees(-90))
+                
+                VStack(spacing: 2) {
+                    Text("\(weekly.thisWeekScore ?? compatibility.harmonyScore)")
+                        .font(.system(size: 32, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                    Text("this week")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.6))
+                }
+            }
+            
+            // Vibe badge
+            if let vibe = weekly.weeklyVibe {
+                HStack {
+                    Image(systemName: "sparkles")
+                    Text(vibe)
+                }
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.purple)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+                .background(Color.purple.opacity(0.2))
+                .cornerRadius(20)
+            }
+            
+            // Comparison with overall
+            HStack(spacing: 20) {
+                VStack {
+                    Text("Overall")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.6))
+                    Text("\(compatibility.harmonyScore)%")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                }
+                
+                Image(systemName: (weekly.thisWeekScore ?? 0) >= compatibility.harmonyScore ? "arrow.up.right" : "arrow.down.right")
+                    .foregroundColor((weekly.thisWeekScore ?? 0) >= compatibility.harmonyScore ? .green : .orange)
+                
+                VStack {
+                    Text("This Week")
+                        .font(.caption2)
+                        .foregroundColor(.white.opacity(0.6))
+                    Text("\(weekly.thisWeekScore ?? 0)%")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.purple)
+                }
+            }
+            .padding()
+            .background(Color.white.opacity(0.05))
+            .cornerRadius(12)
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(20)
+    }
+    
+    // MARK: - This Week Details View
+    private func thisWeekDetailsView(weekly: CompatibilityCache) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label("This Week's Connection", systemImage: "calendar.badge.clock")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            if let reading = weekly.weeklyReading {
+                Text(reading)
+                    .font(.body)
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineSpacing(4)
+            }
+            
+            // Compatibility dimensions
+            HStack(spacing: 16) {
+                compatibilityDimension(
+                    label: "Love",
+                    value: weekly.loveCompatibility ?? "Medium",
+                    icon: "heart.fill",
+                    color: .pink
+                )
+                
+                compatibilityDimension(
+                    label: "Communication",
+                    value: weekly.communicationCompatibility ?? "Medium",
+                    icon: "bubble.left.and.bubble.right.fill",
+                    color: .cyan
+                )
+            }
+            
+            // Celestial influence
+            if let influence = weekly.celestialInfluence {
+                VStack(alignment: .leading, spacing: 8) {
+                    Label("Celestial Influence", systemImage: "moon.stars.fill")
+                        .font(.caption)
+                        .foregroundColor(.indigo)
+                    
+                    Text(influence)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.7))
+                        .italic()
+                }
+                .padding()
+                .background(Color.indigo.opacity(0.1))
+                .cornerRadius(12)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.15), Color.pink.opacity(0.1)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(16)
+    }
+    
+    private func compatibilityDimension(label: String, value: String, icon: String, color: Color) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(color)
+            
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.6))
+            
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(dimensionColor(for: value))
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(12)
+    }
+    
+    private func dimensionColor(for value: String) -> Color {
+        switch value.lowercased() {
+        case "high": return .green
+        case "medium": return .yellow
+        case "low": return .orange
+        default: return .white
+        }
+    }
+    
+    // MARK: - This Week Advice View
+    private func thisWeekAdviceView(weekly: CompatibilityCache) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Growth Tip", systemImage: "lightbulb.fill")
+                .font(.headline)
+                .foregroundColor(.yellow)
+            
+            if let advice = weekly.growthAdvice {
+                Text(advice)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineSpacing(4)
+            }
+            
+            // Refresh button
+            Button {
+                Task {
+                    await loadThisWeekCompatibility()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "arrow.clockwise")
+                    Text("Refresh Reading")
+                }
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.5))
+            }
+            .padding(.top, 8)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.yellow.opacity(0.1))
+        .cornerRadius(16)
+        .padding(.bottom, 20)
+    }
+    
+    // MARK: - Load This Week Compatibility
+    private func loadThisWeekCompatibility() async {
+        guard canAccessThisWeek else { return }
+        
+        isLoadingWeekly = true
+        weeklyError = nil
+        
+        do {
+            // First try to get oracle content for both (for mood context)
+            async let userOracle = SupabaseService.shared.fetchOracleContent(contactId: UUID()) // Would need user ID
+            async let contactOracle = SupabaseService.shared.fetchOracleContent(contactId: contact.id)
+            
+            // Create a temporary "user" contact for the API
+            let userContact = Contact(
+                name: "You",
+                zodiacSign: userSign,
+                birthday: userBirthdayTimestamp > 0 ? Date(timeIntervalSince1970: userBirthdayTimestamp) : nil,
+                birthTime: userBirthTimeTimestamp > 0 ? Date(timeIntervalSince1970: userBirthTimeTimestamp) : nil,
+                birthPlace: userBirthPlace.isEmpty ? nil : userBirthPlace
+            )
+            
+            weeklyCompatibility = try await OracleManager.shared.generateWeeklyCompatibility(
+                contactA: userContact,
+                contactB: contact,
+                oracleA: try? await userOracle,
+                oracleB: try? await contactOracle
+            )
+        } catch {
+            weeklyError = error.localizedDescription
+        }
+        
+        isLoadingWeekly = false
     }
     
     // MARK: - Chart Completeness View

@@ -70,14 +70,27 @@ CREATE INDEX IF NOT EXISTS idx_oracle_week ON oracle_content(week_start);
 -- ─────────────────────────────────────────────────────────────────────────────
 -- TABLE: compatibility_cache
 -- AI-generated compatibility between two contacts
+-- Now supports 3-layer model: Overall (static) + This Week (dynamic)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS compatibility_cache (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     contact_a UUID NOT NULL,
     contact_b UUID NOT NULL,
+    
+    -- Layer 1: Overall (static)
     base_score INTEGER NOT NULL,      -- From AstrologyAPI zodiac_compatibility
     synastry_highlights TEXT[],       -- Key aspects
     ai_output TEXT,                   -- Gemini-generated summary
+    
+    -- Layer 2: This Week (dynamic, AI-generated)
+    this_week_score INTEGER,          -- Weekly adjusted score
+    love_compatibility TEXT,          -- High/Medium/Low
+    communication_compatibility TEXT, -- High/Medium/Low
+    weekly_vibe TEXT,                 -- One word describing weekly energy
+    weekly_reading TEXT,              -- AI-generated weekly reading
+    growth_advice TEXT,               -- Weekly tip
+    celestial_influence TEXT,         -- How current transits affect them
+    
     week_start DATE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     

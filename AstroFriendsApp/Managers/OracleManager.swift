@@ -248,6 +248,67 @@ class OracleManager: ObservableObject {
         return try await SupabaseService.shared.upsertCompatibility(compat)
     }
     
+    // MARK: - "This Week" Compatibility
+    
+    /// Generate weekly compatibility that factors in current sky and moods
+    func generateWeeklyCompatibility(
+        contactA: Contact,
+        contactB: Contact,
+        oracleA: OracleContent?,
+        oracleB: OracleContent?
+    ) async throws -> CompatibilityCache {
+        isLoading = true
+        defer { isLoading = false }
+        
+        // Get profiles
+        let profileA = try await getOrCreateAstroProfile(for: contactA)
+        let profileB = try await getOrCreateAstroProfile(for: contactB)
+        
+        // Get weekly sky context
+        let weeklySky = try? await getOrFetchWeeklySky()
+        
+        // Get base score from static calculation
+        let baseScore = AstralCompatibility(
+            person1Sign: contactA.zodiacSign,
+            person2Sign: contactB.zodiacSign
+        ).harmonyScore
+        
+        // Generate "This Week" compatibility with Gemini
+        let weeklyGenerated = try await GeminiService.shared.generateWeeklyCompatibility(
+            profileA: profileA,
+            profileB: profileB,
+            oracleA: oracleA,
+            oracleB: oracleB,
+            weeklySky: weeklySky,
+            baseScore: baseScore,
+            nameA: contactA.name,
+            nameB: contactB.name
+        )
+        
+        // Create cache entry with weekly data
+        let compat = CompatibilityCache(
+            contactA: contactA.id,
+            contactB: contactB.id,
+            baseScore: baseScore,
+            weekStart: getWeekStart(from: Date()),
+            thisWeekScore: weeklyGenerated.score,
+            loveCompatibility: weeklyGenerated.love,
+            communicationCompatibility: weeklyGenerated.communication,
+            weeklyVibe: weeklyGenerated.vibe,
+            weeklyReading: weeklyGenerated.reading,
+            growthAdvice: weeklyGenerated.advice,
+            celestialInfluence: weeklyGenerated.influence
+        )
+        
+        // Try to save to Supabase
+        do {
+            return try await SupabaseService.shared.upsertCompatibility(compat)
+        } catch {
+            print("⚠️ Failed to save weekly compatibility: \(error.localizedDescription)")
+            return compat
+        }
+    }
+    
     // MARK: - Batch Operations
     
     /// Refresh oracle content for all contacts

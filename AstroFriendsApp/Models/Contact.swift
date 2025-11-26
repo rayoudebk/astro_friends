@@ -44,6 +44,104 @@ final class Contact {
         self.contactIdentifier = contactIdentifier
         self.createdAt = Date()
     }
+    
+    // MARK: - Astro Completion Level
+    
+    /// Determines how much astro data we have for this contact
+    var astroCompletionLevel: AstroCompletionLevel {
+        // No birthday = no astro data
+        guard birthday != nil else {
+            return .none
+        }
+        
+        // Has birthday + birth time + birth place = full chart
+        if birthTime != nil && birthPlace != nil && !birthPlace!.isEmpty {
+            return .full
+        }
+        
+        // Has birthday + birth time OR birth place = extended
+        if birthTime != nil || (birthPlace != nil && !birthPlace!.isEmpty) {
+            return .extended
+        }
+        
+        // Has birthday only = basic (sun sign)
+        return .basic
+    }
+    
+    /// Completion percentage (0-100)
+    var astroCompletionPercentage: Int {
+        var score = 0
+        if birthday != nil { score += 40 }
+        if birthTime != nil { score += 30 }
+        if birthPlace != nil && !birthPlace!.isEmpty { score += 30 }
+        return score
+    }
+    
+    /// What data is missing for full astro profile
+    var missingAstroData: [String] {
+        var missing: [String] = []
+        if birthday == nil { missing.append("birthday") }
+        if birthTime == nil { missing.append("birth time") }
+        if birthPlace == nil || birthPlace!.isEmpty { missing.append("birth place") }
+        return missing
+    }
+}
+
+// MARK: - Astro Completion Level
+
+enum AstroCompletionLevel: String, CaseIterable {
+    case none = "No Astro Data"
+    case basic = "Basic"       // Birthday only (Sun sign)
+    case extended = "Extended" // Birthday + time OR place
+    case full = "Full"         // Birthday + time + place
+    
+    var emoji: String {
+        switch self {
+        case .none: return "❓"
+        case .basic: return "☀️"
+        case .extended: return "🌙"
+        case .full: return "✨"
+        }
+    }
+    
+    var description: String {
+        switch self {
+        case .none:
+            return "Add birthday to unlock astro features"
+        case .basic:
+            return "Sun sign readings available"
+        case .extended:
+            return "Moon sign readings available"
+        case .full:
+            return "Full chart readings available"
+        }
+    }
+    
+    var unlockedFeatures: [String] {
+        switch self {
+        case .none:
+            return []
+        case .basic:
+            return ["Sun sign traits", "Basic horoscope", "Overall compatibility"]
+        case .extended:
+            return ["Sun sign traits", "Basic horoscope", "Overall compatibility", "Moon sign insights", "Better Oracle readings"]
+        case .full:
+            return ["Sun sign traits", "Basic horoscope", "Overall compatibility", "Moon sign insights", "Full Oracle readings", "Rising sign", "This Week compatibility", "Synastry insights"]
+        }
+    }
+    
+    var lockedFeatures: [String] {
+        switch self {
+        case .none:
+            return ["Sun sign traits", "Horoscope", "Compatibility", "Oracle readings", "This Week compatibility"]
+        case .basic:
+            return ["Moon sign insights", "Full Oracle readings", "Rising sign", "This Week compatibility", "Synastry insights"]
+        case .extended:
+            return ["Rising sign", "This Week compatibility", "Synastry insights"]
+        case .full:
+            return []
+        }
+    }
 }
 
 enum ZodiacSign: String, Codable, CaseIterable, Identifiable {

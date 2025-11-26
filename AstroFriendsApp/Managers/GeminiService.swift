@@ -49,6 +49,34 @@ actor GeminiService {
         return try parseCompatibilityResponse(response)
     }
     
+    // MARK: - Generate "This Week" Compatibility
+    /// Creates a weekly compatibility reading that factors in current sky conditions and moods
+    func generateWeeklyCompatibility(
+        profileA: AstroProfile,
+        profileB: AstroProfile,
+        oracleA: OracleContent?,
+        oracleB: OracleContent?,
+        weeklySky: WeeklySky?,
+        baseScore: Int,
+        nameA: String? = nil,
+        nameB: String? = nil
+    ) async throws -> GeneratedWeeklyCompatibility {
+        
+        let prompt = buildWeeklyCompatibilityPrompt(
+            profileA: profileA,
+            profileB: profileB,
+            moodA: oracleA?.mood,
+            moodB: oracleB?.mood,
+            weeklySky: weeklySky,
+            baseScore: baseScore,
+            nameA: nameA,
+            nameB: nameB
+        )
+        
+        let response = try await callGemini(prompt: prompt)
+        return try parseWeeklyCompatibilityResponse(response)
+    }
+    
     // MARK: - Prompt Builders
     
     private func buildWeeklyOraclePrompt(
@@ -139,6 +167,74 @@ actor GeminiService {
         }
         
         Make the reading feel mystical and insightful. Be specific about their chart interactions.
+        """
+    }
+    
+    private func buildWeeklyCompatibilityPrompt(
+        profileA: AstroProfile,
+        profileB: AstroProfile,
+        moodA: String?,
+        moodB: String?,
+        weeklySky: WeeklySky?,
+        baseScore: Int,
+        nameA: String?,
+        nameB: String?
+    ) -> String {
+        let personA = nameA ?? "Person A"
+        let personB = nameB ?? "Person B"
+        
+        var skyContext = ""
+        if let sky = weeklySky {
+            skyContext = """
+            
+            CURRENT CELESTIAL WEATHER:
+            - Moon Phase: \(sky.moonPhase)
+            - Moon Sign: \(sky.moonSign ?? "unknown")
+            - Transits: \(sky.transits?.joined(separator: ", ") ?? "none specified")
+            """
+        }
+        
+        var moodsContext = ""
+        if let mA = moodA, let mB = moodB {
+            moodsContext = """
+            
+            THIS WEEK'S INDIVIDUAL MOODS:
+            - \(personA)'s mood: \(mA)
+            - \(personB)'s mood: \(mB)
+            """
+        }
+        
+        return """
+        You are a mystical astrology oracle specializing in cosmic compatibility.
+        Generate a "THIS WEEK" compatibility reading that factors in current celestial conditions.
+        
+        PERSON A (\(personA)):
+        - Sun: \(profileA.sunSign)
+        - Moon: \(profileA.moonSign ?? "unknown")
+        - Element: \(profileA.element)
+        
+        PERSON B (\(personB)):
+        - Sun: \(profileB.sunSign)
+        - Moon: \(profileB.moonSign ?? "unknown")
+        - Element: \(profileB.element)
+        
+        BASE COMPATIBILITY SCORE: \(baseScore)%
+        \(skyContext)
+        \(moodsContext)
+        
+        Generate a JSON response with this EXACT structure (no markdown, just raw JSON):
+        {
+            "thisWeekScore": <adjusted score 0-100 based on how the current sky affects their connection>,
+            "loveCompatibility": "<High/Medium/Low>",
+            "communicationCompatibility": "<High/Medium/Low>",
+            "weeklyVibe": "<one word describing their energy together this week>",
+            "summary": "A 2-3 sentence overview of how their connection feels THIS WEEK specifically.",
+            "growthAdvice": "One sentence of advice for nurturing their connection this week.",
+            "celestialInfluence": "Brief explanation of how current transits/moon phase affects them."
+        }
+        
+        Factor in how the current moon phase and transits specifically affect this pairing.
+        Make it feel timely and specific to THIS WEEK.
         """
     }
     
@@ -243,6 +339,27 @@ actor GeminiService {
         let decoder = JSONDecoder()
         return try decoder.decode(GeneratedCompatibility.self, from: data)
     }
+    
+    private func parseWeeklyCompatibilityResponse(_ response: String) throws -> GeneratedWeeklyCompatibility {
+        var cleanedResponse = response
+            .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```JSON", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        // Extract JSON if there's extra text
+        if let jsonStart = cleanedResponse.firstIndex(of: "{"),
+           let jsonEnd = cleanedResponse.lastIndex(of: "}") {
+            cleanedResponse = String(cleanedResponse[jsonStart...jsonEnd])
+        }
+        
+        guard let data = cleanedResponse.data(using: .utf8) else {
+            throw GeminiError.parsingError
+        }
+        
+        let decoder = JSONDecoder()
+        return try decoder.decode(GeneratedWeeklyCompatibility.self, from: data)
+    }
 }
 
 // MARK: - Errors
@@ -326,5 +443,52 @@ struct GeneratedCompatibility: Codable {
     let advice: String
     let elementalHarmony: String?
     let emotionalConnection: String?
+}
+
+struct GeneratedWeeklyCompatibility: Codable {
+    let thisWeekScore: Int?
+    let loveCompatibility: String?
+    let communicationCompatibility: String?
+    let weeklyVibe: String?
+    let summary: String?
+    let growthAdvice: String?
+    let celestialInfluence: String?
+    
+    // Snake case alternatives
+    let this_week_score: Int?
+    let love_compatibility: String?
+    let communication_compatibility: String?
+    let weekly_vibe: String?
+    let growth_advice: String?
+    let celestial_influence: String?
+    
+    // Computed properties
+    var score: Int {
+        thisWeekScore ?? this_week_score ?? 50
+    }
+    
+    var love: String {
+        loveCompatibility ?? love_compatibility ?? "Medium"
+    }
+    
+    var communication: String {
+        communicationCompatibility ?? communication_compatibility ?? "Medium"
+    }
+    
+    var vibe: String {
+        weeklyVibe ?? weekly_vibe ?? "Balanced"
+    }
+    
+    var reading: String {
+        summary ?? "The stars are aligning for connection this week."
+    }
+    
+    var advice: String {
+        growthAdvice ?? growth_advice ?? "Be open to each other's energy."
+    }
+    
+    var influence: String? {
+        celestialInfluence ?? celestial_influence
+    }
 }
 

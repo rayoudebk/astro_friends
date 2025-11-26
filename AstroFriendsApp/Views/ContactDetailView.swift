@@ -42,6 +42,11 @@ struct ContactDetailView: View {
                 // Header Card
                 contactHeaderCard
                 
+                // Astro Completion Indicator (only if not full)
+                if contact.astroCompletionLevel != .full {
+                    astroCompletionCard
+                }
+                
                 // Zodiac & Horoscope Card
                 zodiacCard
                 
@@ -229,6 +234,92 @@ struct ContactDetailView: View {
         .frame(maxWidth: .infinity)
         .background(Color.white.opacity(0.08))
         .cornerRadius(20)
+    }
+    
+    // MARK: - Astro Completion Card
+    private var astroCompletionCard: some View {
+        Button {
+            showingEditSheet = true
+        } label: {
+            HStack(spacing: 12) {
+                // Completion indicator
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.2), lineWidth: 3)
+                        .frame(width: 44, height: 44)
+                    
+                    Circle()
+                        .trim(from: 0, to: CGFloat(contact.astroCompletionPercentage) / 100)
+                        .stroke(
+                            completionGradient,
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                        .frame(width: 44, height: 44)
+                        .rotationEffect(.degrees(-90))
+                    
+                    Text(contact.astroCompletionLevel.emoji)
+                        .font(.title3)
+                }
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack {
+                        Text("Astro Profile: \(contact.astroCompletionPercentage)%")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        Text(contact.astroCompletionLevel.rawValue)
+                            .font(.caption)
+                            .foregroundColor(completionColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(completionColor.opacity(0.2))
+                            .cornerRadius(8)
+                    }
+                    
+                    if !contact.missingAstroData.isEmpty {
+                        Text("Add \(contact.missingAstroData.joined(separator: ", ")) for deeper readings")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                            .lineLimit(1)
+                    }
+                }
+                
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.4))
+            }
+            .padding()
+            .background(
+                LinearGradient(
+                    colors: [completionColor.opacity(0.15), Color.white.opacity(0.05)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .cornerRadius(16)
+        }
+        .buttonStyle(.plain)
+    }
+    
+    private var completionColor: Color {
+        switch contact.astroCompletionLevel {
+        case .none: return .orange
+        case .basic: return .yellow
+        case .extended: return .cyan
+        case .full: return .green
+        }
+    }
+    
+    private var completionGradient: LinearGradient {
+        switch contact.astroCompletionLevel {
+        case .none: return LinearGradient(colors: [.orange, .red], startPoint: .leading, endPoint: .trailing)
+        case .basic: return LinearGradient(colors: [.yellow, .orange], startPoint: .leading, endPoint: .trailing)
+        case .extended: return LinearGradient(colors: [.cyan, .blue], startPoint: .leading, endPoint: .trailing)
+        case .full: return LinearGradient(colors: [.green, .mint], startPoint: .leading, endPoint: .trailing)
+        }
     }
     
     private var zodiacCard: some View {
