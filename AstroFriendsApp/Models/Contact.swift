@@ -130,14 +130,6 @@ enum ZodiacSign: String, Codable, CaseIterable {
         }
     }
     
-    var modality: Modality {
-        switch self {
-        case .aries, .cancer, .libra, .capricorn: return .cardinal
-        case .taurus, .leo, .scorpio, .aquarius: return .fixed
-        case .gemini, .virgo, .sagittarius, .pisces: return .mutable
-        }
-    }
-    
     // Get zodiac sign from birthday
     static func from(birthday: Date) -> ZodiacSign {
         let calendar = Calendar.current
@@ -160,10 +152,4 @@ enum ZodiacSign: String, Codable, CaseIterable {
         default: return .aries
         }
     }
-}
-
-enum Modality: String, Codable {
-    case cardinal = "Cardinal"
-    case fixed = "Fixed"
-    case mutable = "Mutable"
 }

@@ -329,7 +329,7 @@ enum ModalityDynamic {
 
 // MARK: - Modality Extension for ZodiacSign
 
-enum Modality: String {
+enum Modality: String, Codable {
     case cardinal = "Cardinal"
     case fixed = "Fixed"
     case mutable = "Mutable"
