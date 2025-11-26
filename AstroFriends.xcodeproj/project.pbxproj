@@ -14,12 +14,10 @@
 		A10000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ContentView.swift */; };
 		A10000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* Assets.xcassets */; };
 		A10000000000000000000004 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* Contact.swift */; };
-		A10000000000000000000005 /* CheckIn.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* CheckIn.swift */; };
 		A10000000000000000000006 /* Horoscope.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* Horoscope.swift */; };
 		A10000000000000000000007 /* AddContactView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* AddContactView.swift */; };
 		A10000000000000000000008 /* ContactDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* ContactDetailView.swift */; };
 		A10000000000000000000009 /* EditContactView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* EditContactView.swift */; };
-		A1000000000000000000000A /* CheckInSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* CheckInSheetView.swift */; };
 		A1000000000000000000000B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* SettingsView.swift */; };
 		A1000000000000000000000C /* ContactRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* ContactRowView.swift */; };
 		A1000000000000000000000D /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* EmptyStateView.swift */; };
@@ -34,12 +32,10 @@
 		A10000000000000000000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A10000000000000000000013 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A10000000000000000000014 /* Contact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contact.swift; sourceTree = "<group>"; };
-		A10000000000000000000015 /* CheckIn.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckIn.swift; sourceTree = "<group>"; };
 		A10000000000000000000016 /* Horoscope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Horoscope.swift; sourceTree = "<group>"; };
 		A10000000000000000000017 /* AddContactView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddContactView.swift; sourceTree = "<group>"; };
 		A10000000000000000000018 /* ContactDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactDetailView.swift; sourceTree = "<group>"; };
 		A10000000000000000000019 /* EditContactView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditContactView.swift; sourceTree = "<group>"; };
-		A1000000000000000000001A /* CheckInSheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckInSheetView.swift; sourceTree = "<group>"; };
 		A1000000000000000000001B /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000000000000000000001C /* ContactRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactRowView.swift; sourceTree = "<group>"; };
 		A1000000000000000000001D /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
@@ -84,7 +80,6 @@
 				8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */,
 				8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */,
 				A10000000000000000000014 /* Contact.swift */,
-				A10000000000000000000015 /* CheckIn.swift */,
 				A10000000000000000000016 /* Horoscope.swift */,
 			);
 			path = Models;
@@ -97,7 +92,6 @@
 				A10000000000000000000017 /* AddContactView.swift */,
 				A10000000000000000000018 /* ContactDetailView.swift */,
 				A10000000000000000000019 /* EditContactView.swift */,
-				A1000000000000000000001A /* CheckInSheetView.swift */,
 				A1000000000000000000001B /* SettingsView.swift */,
 				A10000000000000000000034 /* Components */,
 			);
@@ -194,13 +188,11 @@
 				A10000000000000000000002 /* ContentView.swift in Sources */,
 				A10000000000000000000004 /* Contact.swift in Sources */,
 				8FB3E3F72ED607C400DDDCC5 /* CompatibilityView.swift in Sources */,
-				A10000000000000000000005 /* CheckIn.swift in Sources */,
 				A10000000000000000000006 /* Horoscope.swift in Sources */,
 				A10000000000000000000007 /* AddContactView.swift in Sources */,
 				A10000000000000000000008 /* ContactDetailView.swift in Sources */,
 				A10000000000000000000009 /* EditContactView.swift in Sources */,
 				8FFD09AE2ED60DBF0007B015 /* NatalChart.swift in Sources */,
-				A1000000000000000000000A /* CheckInSheetView.swift in Sources */,
 				A1000000000000000000000B /* SettingsView.swift in Sources */,
 				8FB3E3F52ED607B200DDDCC5 /* AstralCompatibility.swift in Sources */,
 				A1000000000000000000000C /* ContactRowView.swift in Sources */,
