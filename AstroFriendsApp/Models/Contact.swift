@@ -44,12 +44,6 @@ final class Contact {
         self.contactIdentifier = contactIdentifier
         self.createdAt = Date()
     }
-    
-    // Computed property for natal chart (used by compatibility feature)
-    var natalChart: NatalChart? {
-        guard let birthday = birthday else { return nil }
-        return NatalChart(birthDate: birthday, birthTime: birthTime, birthPlace: birthPlace)
-    }
 }
 
 enum ZodiacSign: String, Codable, CaseIterable {
