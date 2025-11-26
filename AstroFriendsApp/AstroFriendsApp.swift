@@ -1096,10 +1096,65 @@ struct ReadingsView: View {
 
 // MARK: - Search View
 struct SearchView: View {
+    @AppStorage("userZodiacSign") private var savedUserSign: String = "Aries"
     @State private var messageText = ""
     @State private var messages: [ChatMessage] = []
     @State private var isTyping = false
+    @State private var currentTopic: AstrologyTopic = .general
+    @State private var showFollowUps = false
     @FocusState private var isTextFieldFocused: Bool
+    
+    // Topic categories for follow-up suggestions
+    enum AstrologyTopic {
+        case general, compatibility, horoscope, planets, signs, houses, transits
+        
+        var followUpQuestions: [String] {
+            switch self {
+            case .general:
+                return [
+                    "What's my horoscope for today?",
+                    "Tell me about my zodiac sign",
+                    "What moon phase are we in?"
+                ]
+            case .compatibility:
+                return [
+                    "What signs am I most compatible with?",
+                    "How do our moon signs affect compatibility?",
+                    "What makes a good zodiac match?"
+                ]
+            case .horoscope:
+                return [
+                    "What about my love life this week?",
+                    "How's my career looking?",
+                    "What should I focus on today?"
+                ]
+            case .planets:
+                return [
+                    "What does Venus represent?",
+                    "How does Mars affect my energy?",
+                    "What is Saturn return?"
+                ]
+            case .signs:
+                return [
+                    "What are the fire signs like?",
+                    "Tell me about water sign emotions",
+                    "What makes earth signs grounded?"
+                ]
+            case .houses:
+                return [
+                    "What does my 7th house represent?",
+                    "Which house rules career?",
+                    "What is the 12th house about?"
+                ]
+            case .transits:
+                return [
+                    "When is the next Mercury retrograde?",
+                    "How do full moons affect me?",
+                    "What transits are happening now?"
+                ]
+            }
+        }
+    }
     
     var body: some View {
         NavigationStack {
@@ -1123,6 +1178,12 @@ struct SearchView: View {
                                     Spacer()
                                 }
                                 .padding(.horizontal)
+                            }
+                            
+                            // Follow-up suggestions after AI response
+                            if showFollowUps && !messages.isEmpty && !isTyping {
+                                followUpSuggestions
+                                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                             }
                         }
                         .padding()
@@ -1160,9 +1221,19 @@ struct SearchView: View {
                 
                 if !messages.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
-                        Button { messages.removeAll() } label: {
-                            Image(systemName: "trash")
-                                .foregroundColor(.white.opacity(0.6))
+                        Button {
+                            withAnimation {
+                                messages.removeAll()
+                                currentTopic = .general
+                                showFollowUps = false
+                            }
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "plus.bubble")
+                                Text("New")
+                                    .font(.caption)
+                            }
+                            .foregroundColor(.purple)
                         }
                     }
                 }
@@ -1192,13 +1263,68 @@ struct SearchView: View {
                     .foregroundColor(.white.opacity(0.6))
             }
             
-            VStack(spacing: 12) {
-                searchSuggestionButton("What does my horoscope say today?")
-                searchSuggestionButton("Am I compatible with a Leo?")
-                searchSuggestionButton("What does Mercury retrograde mean?")
-                searchSuggestionButton("Explain my rising sign")
+            // Categorized suggestions
+            VStack(alignment: .leading, spacing: 16) {
+                suggestionCategory("🔮 Your Horoscope", questions: [
+                    "What does my horoscope say today?",
+                    "What's in store for me this week?"
+                ])
+                
+                suggestionCategory("💕 Compatibility", questions: [
+                    "Am I compatible with a Leo?",
+                    "What signs match with \(savedUserSign)?"
+                ])
+                
+                suggestionCategory("🌙 Moon & Planets", questions: [
+                    "What moon phase are we in?",
+                    "What does Mercury retrograde mean?"
+                ])
+                
+                suggestionCategory("⭐ Birth Chart", questions: [
+                    "Explain my rising sign",
+                    "What does my sun sign mean?"
+                ])
             }
         }
+    }
+    
+    private func suggestionCategory(_ title: String, questions: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.5))
+                .padding(.leading, 4)
+            
+            ForEach(questions, id: \.self) { question in
+                searchSuggestionButton(question)
+            }
+        }
+    }
+    
+    private var followUpSuggestions: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Continue exploring:")
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
+                Spacer()
+            }
+            
+            FlowLayout(spacing: 8) {
+                ForEach(currentTopic.followUpQuestions, id: \.self) { question in
+                    Button { sendMessage(question) } label: {
+                        Text(question)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(Color.purple.opacity(0.3))
+                            .cornerRadius(16)
+                    }
+                }
+            }
+        }
+        .padding(.top, 8)
     }
     
     private func searchSuggestionButton(_ text: String) -> some View {
@@ -1237,6 +1363,25 @@ struct SearchView: View {
         .background(Color(red: 0.05, green: 0.05, blue: 0.12))
     }
     
+    private func detectTopic(from query: String) -> AstrologyTopic {
+        let lowercased = query.lowercased()
+        
+        if lowercased.contains("compatible") || lowercased.contains("match") || lowercased.contains("relationship") {
+            return .compatibility
+        } else if lowercased.contains("horoscope") || lowercased.contains("today") || lowercased.contains("week") || lowercased.contains("forecast") {
+            return .horoscope
+        } else if lowercased.contains("mercury") || lowercased.contains("venus") || lowercased.contains("mars") || lowercased.contains("saturn") || lowercased.contains("jupiter") || lowercased.contains("planet") {
+            return .planets
+        } else if lowercased.contains("sign") || lowercased.contains("aries") || lowercased.contains("taurus") || lowercased.contains("gemini") || lowercased.contains("cancer") || lowercased.contains("leo") || lowercased.contains("virgo") || lowercased.contains("libra") || lowercased.contains("scorpio") || lowercased.contains("sagittarius") || lowercased.contains("capricorn") || lowercased.contains("aquarius") || lowercased.contains("pisces") {
+            return .signs
+        } else if lowercased.contains("house") || lowercased.contains("ascendant") || lowercased.contains("rising") {
+            return .houses
+        } else if lowercased.contains("retrograde") || lowercased.contains("transit") || lowercased.contains("moon phase") || lowercased.contains("full moon") || lowercased.contains("new moon") {
+            return .transits
+        }
+        return .general
+    }
+    
     private func sendMessage(_ text: String) {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
@@ -1244,6 +1389,10 @@ struct SearchView: View {
         messages.append(userMessage)
         messageText = ""
         isTextFieldFocused = false
+        showFollowUps = false
+        
+        // Detect topic for follow-up suggestions
+        currentTopic = detectTopic(from: text)
         
         isTyping = true
         
@@ -1254,6 +1403,13 @@ struct SearchView: View {
                 isTyping = false
                 let aiMessage = ChatMessage(content: response, isUser: false)
                 messages.append(aiMessage)
+                
+                // Show follow-up suggestions after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    withAnimation {
+                        showFollowUps = true
+                    }
+                }
             }
         }
     }
@@ -1265,18 +1421,23 @@ struct SearchView: View {
         let moonSign = MoonSign.current()
         
         let prompt = """
-        You are a wise, warm, and poetic astrologer called "The Oracle of Stars". 
-        Answer the user's question about astrology in a helpful, mystical yet accessible way.
-        Keep responses concise (2-3 paragraphs max).
+        You are "The Oracle of Stars", a wise, warm, and poetic astrologer.
+        
+        IMPORTANT RULES:
+        - ONLY answer questions about astrology, zodiac signs, horoscopes, planets, birth charts, compatibility, moon phases, and celestial events.
+        - If the question is NOT about astrology, kindly redirect: "I specialize in the celestial arts. Ask me about your horoscope, zodiac compatibility, planets, or birth chart!"
+        - Keep responses concise (2-3 paragraphs max).
+        - Be mystical yet accessible, warm and insightful.
+        - Reference the current celestial context when relevant.
         
         Current celestial context:
-        - Moon Phase: \(moonPhase.rawValue)
-        - Moon Sign: \(moonSign.rawValue)
-        - User's Sun Sign: \(userSign.rawValue)
+        - Moon Phase: \(moonPhase.rawValue) \(moonPhase.emoji)
+        - Moon Sign: \(moonSign.rawValue) - \(moonSign.emotionalFlavor)
+        - User's Sun Sign: \(userSign.rawValue) \(userSign.emoji)
         
         User's question: \(query)
         
-        Respond in a warm, insightful way that combines astrological wisdom with practical guidance.
+        Respond with astrological wisdom and practical guidance.
         """
         
         do {
@@ -1363,6 +1524,51 @@ struct TypingIndicator: View {
             withAnimation(.easeInOut(duration: 0.4).repeatForever()) {
                 animationOffset = (animationOffset + 1) % 3
             }
+        }
+    }
+}
+
+// MARK: - Flow Layout for Follow-up Suggestions
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+    
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let result = FlowResult(in: proposal.width ?? 0, subviews: subviews, spacing: spacing)
+        return CGSize(width: proposal.width ?? 0, height: result.height)
+    }
+    
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let result = FlowResult(in: bounds.width, subviews: subviews, spacing: spacing)
+        for (index, subview) in subviews.enumerated() {
+            let point = result.positions[index]
+            subview.place(at: CGPoint(x: bounds.minX + point.x, y: bounds.minY + point.y), proposal: .unspecified)
+        }
+    }
+    
+    struct FlowResult {
+        var positions: [CGPoint] = []
+        var height: CGFloat = 0
+        
+        init(in width: CGFloat, subviews: Subviews, spacing: CGFloat) {
+            var x: CGFloat = 0
+            var y: CGFloat = 0
+            var rowHeight: CGFloat = 0
+            
+            for subview in subviews {
+                let size = subview.sizeThatFits(.unspecified)
+                
+                if x + size.width > width && x > 0 {
+                    x = 0
+                    y += rowHeight + spacing
+                    rowHeight = 0
+                }
+                
+                positions.append(CGPoint(x: x, y: y))
+                rowHeight = max(rowHeight, size.height)
+                x += size.width + spacing
+            }
+            
+            height = y + rowHeight
         }
     }
 }
