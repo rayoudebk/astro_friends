@@ -8,92 +8,47 @@ final class Contact {
     var phoneNumber: String?
     var email: String?
     var zodiacSign: ZodiacSign
-    var frequencyDays: Int
-    var preferredDayOfWeek: Int? // 1 = Sunday, 7 = Saturday
-    var preferredHour: Int? // 0-23
-    var lastCheckInDate: Date?
     var notes: String
     var isFavorite: Bool
     var createdAt: Date
-    var reminders: [String] // Checklist items
-    var giftIdea: String // Next gift idea
-    var photosPersonLocalIdentifier: String? // Link to Photos app person
-    var birthday: Date? // Birthday from contacts
-    var birthTime: Date? // Time of birth (hour/minute)
-    var birthPlace: String? // City/Country of birth
-    var profileImageData: Data? // Profile image from contacts
-    var contactIdentifier: String? // Original CNContact identifier
-    var weMet: String // "We met..." text
-    
-    @Relationship(deleteRule: .cascade, inverse: \CheckIn.contact)
-    var checkIns: [CheckIn]?
+    var birthday: Date?
+    var birthTime: Date?
+    var birthPlace: String?
+    var profileImageData: Data?
+    var contactIdentifier: String?
     
     init(
         name: String,
         phoneNumber: String? = nil,
         email: String? = nil,
         zodiacSign: ZodiacSign = .aries,
-        frequencyDays: Int = 30, // Default to monthly
-        preferredDayOfWeek: Int? = nil,
-        preferredHour: Int? = nil,
         notes: String = "",
         isFavorite: Bool = false,
-        reminders: [String] = [],
-        giftIdea: String = "",
-        photosPersonLocalIdentifier: String? = nil,
         birthday: Date? = nil,
         birthTime: Date? = nil,
         birthPlace: String? = nil,
         profileImageData: Data? = nil,
-        contactIdentifier: String? = nil,
-        weMet: String = ""
+        contactIdentifier: String? = nil
     ) {
         self.id = UUID()
         self.name = name
         self.phoneNumber = phoneNumber
         self.email = email
         self.zodiacSign = zodiacSign
-        self.frequencyDays = frequencyDays
-        self.preferredDayOfWeek = preferredDayOfWeek
-        self.preferredHour = preferredHour
         self.notes = notes
         self.isFavorite = isFavorite
-        self.reminders = reminders
-        self.giftIdea = giftIdea
-        self.photosPersonLocalIdentifier = photosPersonLocalIdentifier
         self.birthday = birthday
         self.birthTime = birthTime
         self.birthPlace = birthPlace
         self.profileImageData = profileImageData
         self.contactIdentifier = contactIdentifier
-        self.weMet = weMet
         self.createdAt = Date()
-        self.checkIns = []
     }
     
-    var daysUntilNextCheckIn: Int {
-        guard let lastCheckIn = lastCheckInDate else {
-            return 0 // Overdue - no check-in yet
-        }
-        
-        let daysSinceLastCheckIn = Calendar.current.dateComponents(
-            [.day],
-            from: lastCheckIn,
-            to: Date()
-        ).day ?? 0
-        
-        return max(0, frequencyDays - daysSinceLastCheckIn)
-    }
-    
-    var isOverdue: Bool {
-        daysUntilNextCheckIn == 0
-    }
-    
-    var nextCheckInDate: Date? {
-        guard let lastCheckIn = lastCheckInDate else {
-            return Date()
-        }
-        return Calendar.current.date(byAdding: .day, value: frequencyDays, to: lastCheckIn)
+    // Computed property for natal chart (used by compatibility feature)
+    var natalChart: NatalChart? {
+        guard let birthday = birthday else { return nil }
+        return NatalChart(birthDate: birthday, birthTime: birthTime, birthPlace: birthPlace)
     }
 }
 
@@ -181,6 +136,14 @@ enum ZodiacSign: String, Codable, CaseIterable {
         }
     }
     
+    var modality: Modality {
+        switch self {
+        case .aries, .cancer, .libra, .capricorn: return .cardinal
+        case .taurus, .leo, .scorpio, .aquarius: return .fixed
+        case .gemini, .virgo, .sagittarius, .pisces: return .mutable
+        }
+    }
+    
     // Get zodiac sign from birthday
     static func from(birthday: Date) -> ZodiacSign {
         let calendar = Calendar.current
@@ -205,4 +168,8 @@ enum ZodiacSign: String, Codable, CaseIterable {
     }
 }
 
-
+enum Modality: String, Codable {
+    case cardinal = "Cardinal"
+    case fixed = "Fixed"
+    case mutable = "Mutable"
+}

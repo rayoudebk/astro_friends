@@ -7,8 +7,6 @@ struct AstroFriendsApp: App {
         WindowGroup {
             ContentView()
         }
-        .modelContainer(for: [Contact.self, CheckIn.self])
+        .modelContainer(for: [Contact.self])
     }
 }
-
-
