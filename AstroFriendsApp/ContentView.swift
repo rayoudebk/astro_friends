@@ -398,6 +398,7 @@ struct HoroscopeCardView: View {
 struct HoroscopeDetailView: View {
     let sign: ZodiacSign
     @Environment(\.dismiss) private var dismiss
+    @State private var showingCompatibilitySign: ZodiacSign? = nil
     
     var horoscope: Horoscope {
         Horoscope.getWeeklyHoroscope(for: sign)
@@ -625,25 +626,35 @@ struct HoroscopeDetailView: View {
                             .font(.headline)
                             .foregroundColor(.white)
                         
-                        HStack(spacing: 12) {
-                            Text(horoscope.compatibility.emoji)
-                                .font(.title)
-                            
-                            VStack(alignment: .leading) {
-                                Text(horoscope.compatibility.rawValue)
-                                    .font(.subheadline)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white)
+                        Button {
+                            showingCompatibilitySign = horoscope.compatibility
+                        } label: {
+                            HStack(spacing: 12) {
+                                Text(horoscope.compatibility.emoji)
+                                    .font(.title)
                                 
-                                Text(horoscope.compatibility.dateRange)
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.7))
+                                VStack(alignment: .leading) {
+                                    Text(horoscope.compatibility.rawValue)
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.white)
+                                    
+                                    Text(horoscope.compatibility.dateRange)
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.7))
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.white.opacity(0.5))
                             }
+                            .padding()
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.white.opacity(0.08))
+                            .cornerRadius(12)
                         }
-                        .padding()
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.white.opacity(0.08))
-                        .cornerRadius(12)
+                        .buttonStyle(.plain)
                     }
                 }
                 .padding()
@@ -669,6 +680,9 @@ struct HoroscopeDetailView: View {
             }
         }
         .preferredColorScheme(.dark)
+        .sheet(item: $showingCompatibilitySign) { compatSign in
+            HoroscopeDetailView(sign: compatSign)
+        }
     }
     
     func elementColor(for sign: ZodiacSign) -> Color {

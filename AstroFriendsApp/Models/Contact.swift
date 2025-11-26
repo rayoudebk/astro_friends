@@ -46,7 +46,8 @@ final class Contact {
     }
 }
 
-enum ZodiacSign: String, Codable, CaseIterable {
+enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
+    var id: String { rawValue }
     case aries = "Aries"
     case taurus = "Taurus"
     case gemini = "Gemini"
