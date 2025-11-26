@@ -71,16 +71,25 @@ struct ContactRowView: View {
                 
                 // Zodiac sign info
                 HStack(spacing: 4) {
-                    Text(contact.zodiacSign.emoji)
-                        .font(.caption)
-                    Text(contact.zodiacSign.rawValue)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                    Text("•")
-                        .foregroundColor(.white.opacity(0.3))
-                    Text(contact.zodiacSign.element)
-                        .font(.caption)
-                        .foregroundColor(elementColor(for: contact.zodiacSign).opacity(0.8))
+                    if contact.zodiacSign.isMissingInfo {
+                        Image(systemName: "questionmark.circle")
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        Text("Missing Info")
+                            .font(.caption)
+                            .foregroundColor(.orange.opacity(0.8))
+                    } else {
+                        Text(contact.zodiacSign.emoji)
+                            .font(.caption)
+                        Text(contact.zodiacSign.rawValue)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                        Text("•")
+                            .foregroundColor(.white.opacity(0.3))
+                        Text(contact.zodiacSign.element)
+                            .font(.caption)
+                            .foregroundColor(elementColor(for: contact.zodiacSign).opacity(0.8))
+                    }
                 }
             }
             

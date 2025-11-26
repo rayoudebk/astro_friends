@@ -379,7 +379,7 @@ struct AddContactView: View {
             } else if let bday = birthday {
                 zodiacSign = ZodiacSign.from(birthday: bday)
             } else {
-                zodiacSign = .aries
+                zodiacSign = .unknown
             }
             
             let contact = Contact(
@@ -448,15 +448,17 @@ struct ContactSelectionRow: View {
                     showingZodiacPicker = true
                 } label: {
                     HStack(spacing: 4) {
-                        if let sign = zodiacSign {
+                        if let sign = zodiacSign, !sign.isMissingInfo {
                             Text(sign.emoji)
                             Text(sign.rawValue)
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.7))
                         } else {
-                            Text("Set sign")
+                            Image(systemName: "questionmark.circle")
+                                .foregroundColor(.orange)
+                            Text("Missing info")
                                 .font(.caption)
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundColor(.orange.opacity(0.8))
                         }
                         Image(systemName: "chevron.down")
                             .font(.caption2)
@@ -496,7 +498,7 @@ struct ZodiacPickerView: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(ZodiacSign.allCases, id: \.self) { sign in
+                ForEach(ZodiacSign.realSigns, id: \.self) { sign in
                     Button {
                         onSelect(sign)
                         dismiss()

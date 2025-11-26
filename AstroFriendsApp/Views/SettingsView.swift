@@ -36,7 +36,8 @@ struct SettingsView: View {
                     if count > 0 {
                         HStack {
                             Text(sign.emoji)
-                            Text(sign.rawValue)
+                            Text(sign.isMissingInfo ? "Missing Info" : sign.rawValue)
+                                .foregroundColor(sign.isMissingInfo ? .orange : .primary)
                             Spacer()
                             Text("\(count)")
                                 .foregroundColor(.secondary)

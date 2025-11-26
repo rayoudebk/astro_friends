@@ -352,6 +352,8 @@ extension ZodiacSign {
             return .fixed
         case .gemini, .virgo, .sagittarius, .pisces:
             return .mutable
+        case .unknown:
+            return .mutable // Default fallback
         }
     }
 }

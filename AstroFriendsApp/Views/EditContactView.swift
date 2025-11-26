@@ -181,7 +181,7 @@ struct EditContactView: View {
                 
                 Section("Zodiac Sign") {
                     Picker("Sign", selection: $zodiacSign) {
-                        ForEach(ZodiacSign.allCases, id: \.self) { sign in
+                        ForEach(ZodiacSign.realSigns, id: \.self) { sign in
                             HStack {
                                 Text(sign.emoji)
                                 Text(sign.rawValue)

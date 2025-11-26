@@ -58,7 +58,7 @@ struct NatalChart {
         let signsMoved = Int(Double(daysSinceReference) / daysPerSign)
         
         // Get the reference sign index
-        let referenceIndex = ZodiacSign.allCases.firstIndex(of: referenceMoonSign) ?? 0
+        let referenceIndex = ZodiacSign.realSigns.firstIndex(of: referenceMoonSign) ?? 0
         
         // Calculate current moon sign index - handle negative values safely
         var moonIndex = (referenceIndex + signsMoved) % 12
@@ -75,10 +75,10 @@ struct NatalChart {
             if adjustedIndex < 0 {
                 adjustedIndex += 12
             }
-            return ZodiacSign.allCases[adjustedIndex]
+            return ZodiacSign.realSigns[adjustedIndex]
         }
         
-        return ZodiacSign.allCases[moonIndex]
+        return ZodiacSign.realSigns[moonIndex]
     }
     
     // MARK: - Rising Sign Calculation
@@ -97,7 +97,7 @@ struct NatalChart {
         let decimalHour = Double(hour) + Double(minute) / 60.0
         
         // Get the Sun sign at birth
-        let sunSignIndex = ZodiacSign.allCases.firstIndex(of: sunSign) ?? 0
+        let sunSignIndex = ZodiacSign.realSigns.firstIndex(of: sunSign) ?? 0
         
         // Rising sign calculation:
         // At sunrise (~6am), Rising = Sun sign
@@ -132,7 +132,7 @@ struct NatalChart {
             risingIndex += 12
         }
         
-        return ZodiacSign.allCases[risingIndex]
+        return ZodiacSign.realSigns[risingIndex]
     }
     
     // MARK: - Chart Description
@@ -212,6 +212,7 @@ extension ZodiacSign {
         case .capricorn: return "ambitious, disciplined, and achievement-oriented"
         case .aquarius: return "innovative, humanitarian, and independent"
         case .pisces: return "compassionate, imaginative, and spiritually attuned"
+        case .unknown: return "mysterious and waiting to be discovered"
         }
     }
     
@@ -229,6 +230,7 @@ extension ZodiacSign {
         case .capricorn: return "emotionally controlled, needs achievement, reserved expression"
         case .aquarius: return "emotionally detached, needs freedom, unconventional feelings"
         case .pisces: return "emotionally boundless, needs creativity, absorbs others' emotions"
+        case .unknown: return "emotionally unique, add birthday to discover more"
         }
     }
     
@@ -246,6 +248,7 @@ extension ZodiacSign {
         case .capricorn: return "comes across as serious, capable, and professional"
         case .aquarius: return "comes across as unique, friendly, and progressive"
         case .pisces: return "comes across as dreamy, gentle, and artistic"
+        case .unknown: return "comes across as intriguing, add birthday to discover more"
         }
     }
 }

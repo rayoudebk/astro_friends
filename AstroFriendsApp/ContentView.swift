@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 
+// ContactsView is the same as ContentView (for tab bar)
+typealias ContactsView = ContentView
+
 // MARK: - Cosmic Theme Colors
 struct CosmicTheme {
     static let background = LinearGradient(
@@ -39,9 +42,9 @@ struct ContentView: View {
     // Get ordered zodiac signs (user can reorder)
     var orderedZodiacSigns: [ZodiacSign] {
         if let decoded = try? JSONDecoder().decode([ZodiacSign].self, from: zodiacOrderData), !decoded.isEmpty {
-            return decoded
+            return decoded.filter { !$0.isMissingInfo }
         }
-        return ZodiacSign.allCases
+        return ZodiacSign.realSigns
     }
     
     func saveZodiacOrder(_ signs: [ZodiacSign]) {
@@ -76,19 +79,6 @@ struct ContentView: View {
         return filtered
     }
     
-    var greeting: String {
-        let calendar = Calendar.current
-        let hour = calendar.component(.hour, from: Date())
-        
-        if hour < 12 {
-            return "Good morning"
-        } else if hour < 17 {
-            return "Good afternoon"
-        } else {
-            return "Good evening"
-        }
-    }
-    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -97,35 +87,6 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    // Custom header with greeting and action buttons
-                    HStack {
-                        Text(greeting)
-                            .font(.largeTitle)
-                            .fontWeight(.bold)
-                            .foregroundColor(CosmicTheme.textPrimary)
-                        
-                        Spacer()
-                        
-                        HStack(spacing: 12) {
-                            NavigationLink(destination: SettingsView()) {
-                                Image(systemName: "gearshape")
-                                    .font(.title3)
-                                    .foregroundColor(CosmicTheme.textSecondary)
-                            }
-                            
-                            Button {
-                                isAddingFromOnboarding = false
-                                showingAddContact = true
-                            } label: {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title3)
-                                    .foregroundColor(CosmicTheme.accent)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, isSearchActive ? 20 : -40)
-                    .padding(.bottom, 4)
                     
                     // Horoscope Card - Large featured card
                     HoroscopeCardView(
@@ -181,23 +142,66 @@ struct ContentView: View {
                     if filteredContacts.isEmpty {
                         EmptyStateView(hasContacts: !contacts.isEmpty)
                     } else {
-                        ScrollView {
-                            LazyVStack(spacing: 8) {
-                                ForEach(filteredContacts) { contact in
+                        List {
+                            ForEach(filteredContacts) { contact in
+                                ZStack {
                                     NavigationLink(destination: ContactDetailView(contact: contact)) {
-                                        ContactRowView(contact: contact)
+                                        EmptyView()
+                                    }
+                                    .opacity(0)
+                                    
+                                    ContactRowView(contact: contact)
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                    Button(role: .destructive) {
+                                        withAnimation {
+                                            modelContext.delete(contact)
+                                        }
+                                    } label: {
+                                        Image(systemName: "trash")
                                     }
                                 }
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
+                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                             }
-                            .padding(.horizontal)
                         }
+                        .listStyle(.plain)
+                        .scrollContentBackground(.hidden)
                     }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("")
             .toolbarBackground(.hidden, for: .navigationBar)
-            .searchable(text: $searchText, isPresented: $isSearchActive, prompt: "Search contacts")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    HStack(spacing: 14) {
+                        NavigationLink(destination: SettingsView()) {
+                            Image(systemName: "gearshape")
+                                .font(.body)
+                                .foregroundColor(CosmicTheme.textSecondary)
+                        }
+                        
+                        Button {
+                            isSearchActive.toggle()
+                        } label: {
+                            Image(systemName: "magnifyingglass")
+                                .font(.body)
+                                .foregroundColor(isSearchActive ? CosmicTheme.accent : CosmicTheme.textSecondary)
+                        }
+                        
+                        Button {
+                            isAddingFromOnboarding = false
+                            showingAddContact = true
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.body)
+                                .foregroundColor(CosmicTheme.accent)
+                        }
+                    }
+                }
+            }
             .sheet(isPresented: $showingAddContact) {
                 AddContactView(isFromOnboarding: isAddingFromOnboarding)
             }
@@ -227,13 +231,6 @@ struct ContentView: View {
         }
         .preferredColorScheme(.dark)
     }
-    
-    private func deleteContacts(at offsets: IndexSet) {
-        for index in offsets {
-            let contact = filteredContacts[index]
-            modelContext.delete(contact)
-        }
-    }
 }
 
 // MARK: - Horoscope Card View
@@ -252,7 +249,7 @@ struct HoroscopeCardView: View {
         if let selected = selectedSign {
             return selected
         }
-        return ZodiacSign.allCases[currentSignIndex]
+        return ZodiacSign.realSigns[currentSignIndex % ZodiacSign.realSigns.count]
     }
     
     var horoscope: Horoscope {
@@ -382,12 +379,12 @@ struct HoroscopeCardView: View {
         .onReceive(timer) { _ in
             if isCarouselMode {
                 withAnimation(.easeInOut(duration: 0.5)) {
-                    currentSignIndex = (currentSignIndex + 1) % 12
+                    currentSignIndex = (currentSignIndex + 1) % ZodiacSign.realSigns.count
                 }
             }
         }
         .onChange(of: selectedSign) { _, newValue in
-            if let sign = newValue, let index = ZodiacSign.allCases.firstIndex(of: sign) {
+            if let sign = newValue, let index = ZodiacSign.realSigns.firstIndex(of: sign) {
                 currentSignIndex = index
             }
         }

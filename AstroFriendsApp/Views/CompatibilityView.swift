@@ -1,4 +1,5 @@
 import SwiftUI
+import Contacts
 
 // MARK: - Compatibility View
 struct CompatibilityView: View {
@@ -339,7 +340,7 @@ struct CompatibilityView: View {
                         .foregroundColor(.white.opacity(0.7))
                     
                     Menu {
-                        ForEach(ZodiacSign.allCases, id: \.self) { sign in
+                        ForEach(ZodiacSign.realSigns, id: \.self) { sign in
                             Button {
                                 userSign = sign
                                 savedUserSign = sign.rawValue
@@ -754,14 +755,38 @@ struct UserBirthDataView: View {
     @State private var birthTime: Date = Date()
     @State private var birthPlace: String = ""
     
+    @State private var showingContactPicker = false
+    @State private var showingAlert = false
+    @State private var alertMessage = ""
+    
     @Environment(\.dismiss) private var dismiss
     
     var body: some View {
         NavigationStack {
             Form {
                 Section {
+                    Button {
+                        showingContactPicker = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "person.crop.circle.fill")
+                                .foregroundColor(.blue)
+                            Text("Import from Contacts")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                                .font(.caption)
+                        }
+                    }
+                } header: {
+                    Text("Quick Import")
+                } footer: {
+                    Text("Select your contact card to import your birthday.")
+                }
+                
+                Section {
                     Picker("Sun Sign", selection: $userSign) {
-                        ForEach(ZodiacSign.allCases, id: \.self) { sign in
+                        ForEach(ZodiacSign.realSigns, id: \.self) { sign in
                             HStack {
                                 Text(sign.emoji)
                                 Text(sign.rawValue)
@@ -863,6 +888,23 @@ struct UserBirthDataView: View {
             .onAppear {
                 loadData()
             }
+            .sheet(isPresented: $showingContactPicker) {
+                ContactBirthdayPicker { importedBirthday in
+                    hasBirthday = true
+                    birthday = importedBirthday
+                    userSign = ZodiacSign.from(birthday: importedBirthday)
+                    alertMessage = "Birthday imported! \(userSign.emoji) \(userSign.rawValue)"
+                    showingAlert = true
+                } onNoBirthday: {
+                    alertMessage = "That contact doesn't have a birthday set. Please select a contact with a birthday or enter it manually."
+                    showingAlert = true
+                }
+            }
+            .alert("Import Result", isPresented: $showingAlert) {
+                Button("OK") {}
+            } message: {
+                Text(alertMessage)
+            }
         }
     }
     
@@ -883,6 +925,57 @@ struct UserBirthDataView: View {
         userBirthdayTimestamp = hasBirthday ? birthday.timeIntervalSince1970 : 0
         userBirthTimeTimestamp = hasBirthTime ? birthTime.timeIntervalSince1970 : 0
         userBirthPlace = birthPlace
+    }
+}
+
+// MARK: - Contact Birthday Picker
+import ContactsUI
+
+struct ContactBirthdayPicker: UIViewControllerRepresentable {
+    let onBirthdaySelected: (Date) -> Void
+    let onNoBirthday: () -> Void
+    var onNameFound: ((String) -> Void)? = nil
+    
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> CNContactPickerViewController {
+        let picker = CNContactPickerViewController()
+        picker.delegate = context.coordinator
+        picker.displayedPropertyKeys = [CNContactBirthdayKey, CNContactGivenNameKey]
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: CNContactPickerViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, CNContactPickerDelegate {
+        let parent: ContactBirthdayPicker
+        
+        init(_ parent: ContactBirthdayPicker) {
+            self.parent = parent
+        }
+        
+        func contactPicker(_ picker: CNContactPickerViewController, didSelect contact: CNContact) {
+            // Get name if available
+            if !contact.givenName.isEmpty {
+                parent.onNameFound?(contact.givenName)
+            }
+            
+            // Get birthday if available
+            if let birthdayComponents = contact.birthday,
+               let birthdayDate = Calendar.current.date(from: birthdayComponents) {
+                parent.onBirthdaySelected(birthdayDate)
+            } else {
+                parent.onNoBirthday()
+            }
+        }
+        
+        func contactPickerDidCancel(_ picker: CNContactPickerViewController) {
+            // User cancelled, do nothing
+        }
     }
 }
 

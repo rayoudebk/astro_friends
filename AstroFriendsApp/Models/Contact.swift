@@ -60,6 +60,16 @@ enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
     case capricorn = "Capricorn"
     case aquarius = "Aquarius"
     case pisces = "Pisces"
+    case unknown = "Unknown"
+    
+    /// All real zodiac signs (excludes unknown)
+    static var realSigns: [ZodiacSign] {
+        allCases.filter { $0 != .unknown }
+    }
+    
+    var isMissingInfo: Bool {
+        self == .unknown
+    }
     
     var emoji: String {
         switch self {
@@ -75,6 +85,7 @@ enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
         case .capricorn: return "♑️"
         case .aquarius: return "♒️"
         case .pisces: return "♓️"
+        case .unknown: return "❓"
         }
     }
     
@@ -92,6 +103,7 @@ enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
         case .capricorn: return "mountain.2.fill"
         case .aquarius: return "wind"
         case .pisces: return "drop.fill"
+        case .unknown: return "questionmark.circle"
         }
     }
     
@@ -101,6 +113,7 @@ enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
         case .taurus, .virgo, .capricorn: return "Earth"
         case .gemini, .libra, .aquarius: return "Air"
         case .cancer, .scorpio, .pisces: return "Water"
+        case .unknown: return "Unknown"
         }
     }
     
@@ -128,6 +141,7 @@ enum ZodiacSign: String, Codable, CaseIterable, Identifiable {
         case .capricorn: return "Dec 22 - Jan 19"
         case .aquarius: return "Jan 20 - Feb 18"
         case .pisces: return "Feb 19 - Mar 20"
+        case .unknown: return "Birthday missing"
         }
     }
     

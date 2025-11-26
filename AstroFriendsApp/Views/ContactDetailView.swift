@@ -152,16 +152,22 @@ struct ContactDetailView: View {
                 
                 // Zodiac badge
                 HStack(spacing: 6) {
-                    Text(contact.zodiacSign.emoji)
-                    Text(contact.zodiacSign.rawValue)
-                        .fontWeight(.medium)
-                    Text("•")
-                        .foregroundColor(.white.opacity(0.4))
-                    Text(contact.zodiacSign.element)
-                        .foregroundColor(elementColor(for: contact.zodiacSign))
+                    if contact.zodiacSign.isMissingInfo {
+                        Image(systemName: "questionmark.circle")
+                        Text("Missing Info")
+                            .fontWeight(.medium)
+                    } else {
+                        Text(contact.zodiacSign.emoji)
+                        Text(contact.zodiacSign.rawValue)
+                            .fontWeight(.medium)
+                        Text("•")
+                            .foregroundColor(.white.opacity(0.4))
+                        Text(contact.zodiacSign.element)
+                            .foregroundColor(elementColor(for: contact.zodiacSign))
+                    }
                 }
                 .font(.subheadline)
-                .foregroundColor(.white.opacity(0.8))
+                .foregroundColor(contact.zodiacSign.isMissingInfo ? .orange : .white.opacity(0.8))
             }
         }
         .padding()
@@ -171,117 +177,222 @@ struct ContactDetailView: View {
     }
     
     private var zodiacCard: some View {
-        Button {
-            showingHoroscope = true
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(contact.zodiacSign.emoji)
-                        .font(.title)
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Weekly Horoscope")
-                            .font(.headline)
-                            .foregroundColor(.white)
+        Group {
+            if contact.zodiacSign.isMissingInfo {
+                // Show prompt to add birthday
+                Button {
+                    showingEditSheet = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "questionmark.circle.fill")
+                                .font(.title)
+                                .foregroundColor(.orange)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Birthday Missing")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Text("Add birthday to see horoscope")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
+                                Text("Add")
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(Color.orange.opacity(0.3))
+                                    .foregroundColor(.orange)
+                                    .cornerRadius(8)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
                         
-                        Text(contact.zodiacSign.dateRange)
+                        Text("Add their birthday to unlock their zodiac sign, horoscope, and compatibility readings.")
                             .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(2)
                     }
-                    
-                    Spacer()
-                    
-                    HStack(spacing: 4) {
-                        Text(horoscope.mood)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(elementColor(for: contact.zodiacSign).opacity(0.3))
-                            .foregroundColor(elementColor(for: contact.zodiacSign))
-                            .cornerRadius(8)
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                    }
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [Color.orange.opacity(0.15), Color.orange.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
                 }
-                
-                Text(horoscope.weeklyReading)
-                    .font(.caption)
-                    .foregroundColor(.white.opacity(0.7))
-                    .lineLimit(2)
+                .buttonStyle(.plain)
+            } else {
+                Button {
+                    showingHoroscope = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text(contact.zodiacSign.emoji)
+                                .font(.title)
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Weekly Horoscope")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Text(contact.zodiacSign.dateRange)
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            
+                            Spacer()
+                            
+                            HStack(spacing: 4) {
+                                Text(horoscope.mood)
+                                    .font(.caption)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(elementColor(for: contact.zodiacSign).opacity(0.3))
+                                    .foregroundColor(elementColor(for: contact.zodiacSign))
+                                    .cornerRadius(8)
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        
+                        Text(horoscope.weeklyReading)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.7))
+                            .lineLimit(2)
+                    }
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
+                }
+                .buttonStyle(PlainButtonStyle())
             }
-            .padding()
-            .background(
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(16)
         }
-        .buttonStyle(PlainButtonStyle())
     }
     
     private var compatibilityCard: some View {
-        Button {
-            showingCompatibility = true
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    // Your sign + their sign
-                    HStack(spacing: -8) {
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [elementColor(for: userSign), elementColor(for: userSign).opacity(0.5)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
+        Group {
+            if contact.zodiacSign.isMissingInfo {
+                // Show disabled state for missing info
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        HStack(spacing: -8) {
+                            ZStack {
+                                Circle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [elementColor(for: userSign), elementColor(for: userSign).opacity(0.5)],
+                                            startPoint: .topLeading,
+                                            endPoint: .bottomTrailing
+                                        )
                                     )
-                                )
-                                .frame(width: 36, height: 36)
-                            Text(userSign.emoji)
-                                .font(.title3)
+                                    .frame(width: 36, height: 36)
+                                Text(userSign.emoji)
+                                    .font(.title3)
+                            }
+                            
+                            ZStack {
+                                Circle()
+                                    .fill(Color.gray.opacity(0.3))
+                                    .frame(width: 36, height: 36)
+                                Image(systemName: "questionmark")
+                                    .font(.title3)
+                                    .foregroundColor(.orange)
+                            }
                         }
                         
-                        ZStack {
-                            Circle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [elementColor(for: contact.zodiacSign), elementColor(for: contact.zodiacSign).opacity(0.5)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .frame(width: 36, height: 36)
-                            Text(contact.zodiacSign.emoji)
-                                .font(.title3)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Compatibility")
+                                .font(.headline)
+                                .foregroundColor(.white.opacity(0.5))
+                            
+                            Text("Add birthday to unlock")
+                                .font(.caption)
+                                .foregroundColor(.orange.opacity(0.8))
                         }
-                    }
-                    
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Your Compatibility")
-                            .font(.headline)
-                            .foregroundColor(.white)
                         
-                        Text("\(userSign.rawValue) + \(contact.zodiacSign.rawValue)")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
+                        Spacer()
                     }
-                    
-                    Spacer()
-                    
-                    // Harmony badge
-                    HStack(spacing: 4) {
-                        Text(compatibility.harmonyLevel.emoji)
-                            .font(.caption)
-                        Text("\(compatibility.harmonyScore)%")
-                            .font(.caption)
-                            .fontWeight(.semibold)
-                    }
-                    .padding(.horizontal, 10)
+                }
+                .padding()
+                .background(Color.white.opacity(0.03))
+                .cornerRadius(16)
+            } else {
+                Button {
+                    showingCompatibility = true
+                } label: {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            // Your sign + their sign
+                            HStack(spacing: -8) {
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [elementColor(for: userSign), elementColor(for: userSign).opacity(0.5)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 36, height: 36)
+                                    Text(userSign.emoji)
+                                        .font(.title3)
+                                }
+                                
+                                ZStack {
+                                    Circle()
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [elementColor(for: contact.zodiacSign), elementColor(for: contact.zodiacSign).opacity(0.5)],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .frame(width: 36, height: 36)
+                                    Text(contact.zodiacSign.emoji)
+                                        .font(.title3)
+                                }
+                            }
+                            
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Your Compatibility")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                
+                                Text("\(userSign.rawValue) + \(contact.zodiacSign.rawValue)")
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            
+                            Spacer()
+                            
+                            // Harmony badge
+                            HStack(spacing: 4) {
+                                Text(compatibility.harmonyLevel.emoji)
+                                    .font(.caption)
+                                Text("\(compatibility.harmonyScore)%")
+                                    .font(.caption)
+                                    .fontWeight(.semibold)
+                            }
+                            .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(harmonyBadgeColor.opacity(0.3))
                     .foregroundColor(harmonyBadgeColor)
@@ -314,17 +425,19 @@ struct ContactDetailView: View {
                         .foregroundColor(.white.opacity(0.5))
                 }
             }
-            .padding()
-            .background(
-                LinearGradient(
-                    colors: [harmonyBadgeColor.opacity(0.15), Color.white.opacity(0.05)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(16)
+                    .padding()
+                    .background(
+                        LinearGradient(
+                            colors: [harmonyBadgeColor.opacity(0.15), Color.white.opacity(0.05)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .cornerRadius(16)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
         }
-        .buttonStyle(PlainButtonStyle())
     }
     
     private var harmonyBadgeColor: Color {
