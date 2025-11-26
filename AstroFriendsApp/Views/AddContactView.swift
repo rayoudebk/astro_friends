@@ -356,8 +356,9 @@ struct AddContactView: View {
         }
         
         // Trigger oracle generation in background for contacts with birthdays
+        let contactsToProcess = newContacts // Create immutable copy for Task
         Task {
-            await generateOraclesForNewContacts(newContacts)
+            await generateOraclesForNewContacts(contactsToProcess)
         }
         
         dismiss()

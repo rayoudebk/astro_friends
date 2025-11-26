@@ -281,15 +281,31 @@ struct HomeView: View {
         let userContact = createUserContact()
         
         // Check for cached content first
-        if let cached = try? await SupabaseService.shared.fetchOracleContent(contactId: userContact.id) {
-            personalOracle = cached
-        } else {
-            // Generate fresh
-            do {
+        do {
+            if let cached = try await SupabaseService.shared.fetchOracleContent(contactId: userContact.id) {
+                personalOracle = cached
+            } else {
+                // Generate fresh
                 personalOracle = try await OracleManager.shared.generateOracleContent(for: userContact)
-            } catch {
-                personalOracleError = error.localizedDescription
             }
+        } catch let decodingError as DecodingError {
+            // Provide detailed decoding error info
+            switch decodingError {
+            case .typeMismatch(let type, let context):
+                personalOracleError = "Type mismatch: \(type) at \(context.codingPath.map { $0.stringValue }.joined(separator: "."))"
+            case .valueNotFound(let type, let context):
+                personalOracleError = "Value not found: \(type) at \(context.codingPath.map { $0.stringValue }.joined(separator: "."))"
+            case .keyNotFound(let key, _):
+                personalOracleError = "Key not found: \(key.stringValue)"
+            case .dataCorrupted(let context):
+                personalOracleError = "Data corrupted: \(context.debugDescription)"
+            @unknown default:
+                personalOracleError = "Decoding error: \(decodingError.localizedDescription)"
+            }
+            print("❌ Oracle decoding error: \(personalOracleError ?? "")")
+        } catch {
+            personalOracleError = error.localizedDescription
+            print("❌ Oracle error: \(error)")
         }
         
         isLoadingPersonalOracle = false

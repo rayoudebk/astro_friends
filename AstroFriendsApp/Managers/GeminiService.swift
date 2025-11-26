@@ -7,7 +7,7 @@ actor GeminiService {
     static let shared = GeminiService()
     
     private let apiKey = Secrets.Gemini.apiKey
-    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+    private let baseURL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent"
     
     // MARK: - Generate Weekly Oracle Content
     /// Creates personalized weekly horoscope content for a contact
@@ -372,12 +372,31 @@ actor GeminiService {
             throw GeminiError.parsingError
         }
         
+        // First try standard decoding
         do {
             let decoder = JSONDecoder()
             decoder.keyDecodingStrategy = .convertFromSnakeCase
             return try decoder.decode(GeneratedOracleContent.self, from: data)
         } catch {
             print("❌ JSON Decode error: \(error)")
+            
+            // Try manual parsing as fallback
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                print("🔄 Trying manual JSON extraction...")
+                return GeneratedOracleContent(
+                    weeklyReading: json["weekly_reading"] as? String ?? json["weeklyReading"] as? String,
+                    loveAdvice: json["love_advice"] as? String ?? json["loveAdvice"] as? String,
+                    careerAdvice: json["career_advice"] as? String ?? json["careerAdvice"] as? String,
+                    luckyNumber: json["lucky_number"] as? Int ?? json["luckyNumber"] as? Int,
+                    luckyColor: json["lucky_color"] as? String ?? json["luckyColor"] as? String,
+                    mood: json["mood"] as? String,
+                    compatibilitySign: json["compatibility_sign"] as? String ?? json["compatibilitySign"] as? String,
+                    celestialInsight: json["celestial_insight"] as? String ?? json["celestialInsight"] as? String,
+                    weekly_reading: nil, love_advice: nil, career_advice: nil,
+                    lucky_number: nil, lucky_color: nil, compatibility_sign: nil, celestial_insight: nil
+                )
+            }
+            
             throw error
         }
     }

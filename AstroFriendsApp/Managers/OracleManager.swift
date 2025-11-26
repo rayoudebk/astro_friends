@@ -2,12 +2,8 @@ import Foundation
 import CoreLocation
 
 // MARK: - Oracle Manager
-/// Orchestrates the full content generation flow:
-/// 1. Fetch birth data from Contact (client-side, PII stays local)
-/// 2. Call AstrologyAPI to get natal chart data
-/// 3. Store derived astro profile in Supabase (no PII)
-/// 4. Generate oracle content with Gemini
-/// 5. Cache content in Supabase
+/// Orchestrates oracle content generation using Gemini AI
+/// Falls back to local generation if APIs fail
 @MainActor
 class OracleManager: ObservableObject {
     static let shared = OracleManager()
@@ -17,9 +13,9 @@ class OracleManager: ObservableObject {
     
     private let geocoder = CLGeocoder()
     
-    // MARK: - Full Pipeline: Generate Oracle for Contact
+    // MARK: - Generate Oracle Content
     
-    /// Complete flow: API → Supabase → Gemini → Supabase
+    /// Main entry point - tries Gemini first, falls back to local if needed
     func generateOracleContent(for contact: Contact) async throws -> OracleContent {
         isLoading = true
         lastError = nil
@@ -28,33 +24,36 @@ class OracleManager: ObservableObject {
         
         print("🔮 Generating oracle for: \(contact.name) (\(contact.id))")
         
-        // 1. Check if we already have fresh content this week
+        // Check cache first
         if let cached = try? await SupabaseService.shared.fetchOracleContent(contactId: contact.id) {
-            print("✅ Found cached oracle for \(contact.name)")
+            print("✅ Found cached oracle")
             return cached
         }
         
-        print("📝 No cache found, generating fresh oracle...")
+        // Get zodiac sign
+        let sign = contact.zodiacSign
+        guard sign != .unknown else {
+            throw OracleError.missingBirthData("Zodiac sign required")
+        }
         
-        // 2. Get or create astro profile
+        // Build profile locally (no external API needed)
+        let profile = buildLocalProfile(for: contact)
+        print("✅ Built profile: \(profile.sunSign)")
+        
+        // Get weekly sky context locally
+        let weeklySky = buildLocalWeeklySky()
+        print("✅ Weekly sky: \(weeklySky.moonPhase)")
+        
+        // Try Gemini AI generation
         do {
-            let profile = try await getOrCreateAstroProfile(for: contact)
-            print("✅ Got astro profile: \(profile.sunSign)")
-            
-            // 3. Get weekly sky context
-            let weeklySky = try? await getOrFetchWeeklySky()
-            print("✅ Got weekly sky: \(weeklySky?.moonPhase ?? "none")")
-            
-            // 4. Generate content with Gemini
             print("🤖 Calling Gemini...")
             let generated = try await GeminiService.shared.generateWeeklyOracle(
                 profile: profile,
                 weeklySky: weeklySky,
                 contactName: contact.name
             )
-            print("✅ Gemini returned content: \(generated.reading.prefix(50))...")
+            print("✅ Gemini returned content")
             
-            // 5. Create oracle content
             let oracleContent = OracleContent(
                 contactId: contact.id,
                 weekStart: getWeekStart(from: Date()),
@@ -68,20 +67,95 @@ class OracleManager: ObservableObject {
                 celestialInsight: generated.insight
             )
             
-            // Try to save to Supabase (but don't fail if it doesn't work)
-            do {
-                let saved = try await SupabaseService.shared.upsertOracleContent(oracleContent)
-                print("✅ Saved to Supabase")
+            // Cache to Supabase (optional)
+            if let saved = try? await SupabaseService.shared.upsertOracleContent(oracleContent) {
                 return saved
-            } catch {
-                print("⚠️ Failed to save to Supabase: \(error.localizedDescription)")
-                // Return the content anyway - it works, just won't be cached
-                return oracleContent
             }
+            return oracleContent
+            
         } catch {
-            print("❌ Oracle generation failed: \(error)")
-            throw error
+            print("⚠️ Gemini failed: \(error.localizedDescription)")
+            print("📝 Falling back to local generation...")
+            
+            // Fallback to local generation
+            return generateLocalOracle(for: contact, profile: profile, weeklySky: weeklySky)
         }
+    }
+    
+    // MARK: - Build Local Profile (No API)
+    
+    private func buildLocalProfile(for contact: Contact) -> AstroProfile {
+        let sunSign = contact.zodiacSign
+        
+        var moonSign: ZodiacSign? = nil
+        var risingSign: ZodiacSign? = nil
+        
+        if let birthday = contact.birthday {
+            let chart = NatalChart(
+                birthDate: birthday,
+                birthTime: contact.birthTime,
+                birthPlace: contact.birthPlace
+            )
+            moonSign = chart.moonSign
+            risingSign = chart.risingSign
+        }
+        
+        return AstroProfile(
+            contactId: contact.id,
+            sunSign: sunSign,
+            moonSign: moonSign,
+            risingSign: risingSign,
+            element: sunSign.element,
+            modality: sunSign.modalityString
+        )
+    }
+    
+    // MARK: - Build Local Weekly Sky (No API)
+    
+    private func buildLocalWeeklySky() -> WeeklySky {
+        let moonPhase = MoonPhase.current()
+        let moonSign = MoonSign.current()
+        
+        return WeeklySky(
+            weekStart: getWeekStart(from: Date()),
+            moonPhase: moonPhase.rawValue,
+            moonSign: moonSign.rawValue,
+            transits: nil
+        )
+    }
+    
+    // MARK: - Local Oracle Fallback
+    
+    private func generateLocalOracle(
+        for contact: Contact,
+        profile: AstroProfile,
+        weeklySky: WeeklySky
+    ) -> OracleContent {
+        let sign = contact.zodiacSign
+        let horoscope = Horoscope.getWeeklyHoroscope(for: sign)
+        let moonPhase = MoonPhase.current()
+        let moonSign = MoonSign.current()
+        
+        // Build personalized reading
+        var reading = horoscope.weeklyReading
+        reading += "\n\nWith the \(moonPhase.rawValue) \(moonPhase.emoji) in the sky, you may feel \(moonPhase.emotionalTone). \(moonPhase.guidance)"
+        reading += "\n\nThe Moon in \(moonSign.rawValue) adds \(moonSign.emotionalFlavor) to your emotional landscape."
+        
+        // Celestial insight
+        let insight = "The \(moonPhase.rawValue) harmonizes with your \(sign.rawValue) energy, creating a powerful time for \(sign.element.lowercased()) sign activities."
+        
+        return OracleContent(
+            contactId: contact.id,
+            weekStart: getWeekStart(from: Date()),
+            weeklyReading: reading,
+            loveAdvice: horoscope.loveAdvice,
+            careerAdvice: horoscope.careerAdvice,
+            luckyNumber: horoscope.luckyNumber,
+            luckyColor: horoscope.luckyColor,
+            mood: horoscope.mood,
+            compatibilitySign: horoscope.compatibility.rawValue,
+            celestialInsight: insight
+        )
     }
     
     // MARK: - Get or Create Astro Profile
@@ -104,7 +178,7 @@ class OracleManager: ObservableObject {
         }
         
         // Otherwise, create basic profile from local calculation
-        return try await createBasicProfile(for: contact, birthday: birthday)
+        return await createBasicProfile(for: contact, birthday: birthday)
     }
     
     // MARK: - AstrologyAPI Flow (Full Chart)
@@ -163,7 +237,7 @@ class OracleManager: ObservableObject {
     
     // MARK: - Basic Profile (Local Calculation)
     
-    private func createBasicProfile(for contact: Contact, birthday: Date) async throws -> AstroProfile {
+    private func createBasicProfile(for contact: Contact, birthday: Date) async -> AstroProfile {
         let sunSign = ZodiacSign.from(birthday: birthday)
         
         // Use local NatalChart for moon calculation
@@ -182,6 +256,8 @@ class OracleManager: ObservableObject {
             modality: sunSign.modalityString
         )
         
+        print("✅ Created local profile: \(sunSign.rawValue), moon: \(natalChart.moonSign.rawValue)")
+        
         // Try to save to Supabase (but don't fail if it doesn't work)
         do {
             return try await SupabaseService.shared.upsertAstroProfile(profile)
@@ -199,22 +275,44 @@ class OracleManager: ObservableObject {
             return cached
         }
         
-        // Fetch from API
-        let moonPhase = try await AstrologyAPIService.shared.fetchMoonPhase()
-        let transits = try? await AstrologyAPIService.shared.fetchWeeklyTransits()
+        // Try to fetch from AstrologyAPI, but fall back to local calculation
+        var moonPhaseName = "Waxing Crescent" // Default
+        var transitsArray: [String]? = nil
         
-        let sky = WeeklySky(
-            weekStart: getWeekStart(from: Date()),
-            moonPhase: moonPhase.phaseName ?? moonPhase.moonPhase ?? "Unknown",
-            moonSign: nil, // Would need additional API call
-            transits: transits?.transits?.compactMap { transit in
+        do {
+            let moonPhase = try await AstrologyAPIService.shared.fetchMoonPhase()
+            moonPhaseName = moonPhase.phaseName ?? moonPhase.moonPhase ?? "Waxing Crescent"
+            print("✅ Got moon phase from API: \(moonPhaseName)")
+        } catch {
+            // Use local calculation as fallback
+            let currentPhase = MoonPhase.current()
+            moonPhaseName = currentPhase.rawValue
+            print("⚠️ AstrologyAPI failed, using local moon phase: \(moonPhaseName)")
+        }
+        
+        // Try to get transits (optional)
+        if let transits = try? await AstrologyAPIService.shared.fetchWeeklyTransits() {
+            transitsArray = transits.transits?.compactMap { transit in
                 guard let planet = transit.transitingPlanet,
                       let aspect = transit.aspect else { return nil }
                 return "\(planet) \(aspect)"
             }
+        }
+        
+        let sky = WeeklySky(
+            weekStart: getWeekStart(from: Date()),
+            moonPhase: moonPhaseName,
+            moonSign: nil,
+            transits: transitsArray
         )
         
-        return try await SupabaseService.shared.upsertWeeklySky(sky)
+        // Try to save to Supabase, but don't fail if it doesn't work
+        do {
+            return try await SupabaseService.shared.upsertWeeklySky(sky)
+        } catch {
+            print("⚠️ Failed to save weekly sky to Supabase: \(error.localizedDescription)")
+            return sky
+        }
     }
     
     // MARK: - Compatibility

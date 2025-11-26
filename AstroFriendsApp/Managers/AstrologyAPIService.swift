@@ -153,19 +153,32 @@ actor AstrologyAPIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
         
+        print("🌙 AstrologyAPI POST: \(endpoint)")
+        
         let (data, response) = try await URLSession.shared.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AstrologyAPIError.invalidResponse
         }
         
+        // Debug: print raw response
+        let rawResponse = String(data: data, encoding: .utf8) ?? "nil"
+        print("🌙 AstrologyAPI response (\(httpResponse.statusCode)): \(rawResponse.prefix(500))")
+        
         guard (200...299).contains(httpResponse.statusCode) else {
+            print("❌ AstrologyAPI HTTP error: \(httpResponse.statusCode)")
             throw AstrologyAPIError.httpError(statusCode: httpResponse.statusCode)
         }
         
         let decoder = JSONDecoder()
         decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try decoder.decode(T.self, from: data)
+        
+        do {
+            return try decoder.decode(T.self, from: data)
+        } catch {
+            print("❌ AstrologyAPI decode error: \(error)")
+            throw AstrologyAPIError.decodingError(error)
+        }
     }
     
     private func get<T: Decodable>(endpoint: String) async throws -> T {
@@ -216,26 +229,34 @@ enum AstrologyAPIError: Error, LocalizedError {
 
 // MARK: - API Response Models
 
+/// AstrologyAPI returns an array of planets, not a dictionary
 struct NatalPlanetsResponse: Codable {
-    let sun: PlanetPosition?
-    let moon: PlanetPosition?
-    let mercury: PlanetPosition?
-    let venus: PlanetPosition?
-    let mars: PlanetPosition?
-    let jupiter: PlanetPosition?
-    let saturn: PlanetPosition?
-    let uranus: PlanetPosition?
-    let neptune: PlanetPosition?
-    let pluto: PlanetPosition?
+    let planets: [PlanetPosition]
+    
+    // Custom decoding to handle array response
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.planets = try container.decode([PlanetPosition].self)
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(planets)
+    }
+    
+    // Helper to find specific planet
+    func planet(named name: String) -> PlanetPosition? {
+        planets.first { $0.name?.lowercased() == name.lowercased() }
+    }
     
     // Derived helpers
     var sunSign: ZodiacSign? {
-        guard let sign = sun?.sign else { return nil }
+        guard let sign = planet(named: "Sun")?.sign else { return nil }
         return ZodiacSign(rawValue: sign.capitalized)
     }
     
     var moonSign: ZodiacSign? {
-        guard let sign = moon?.sign else { return nil }
+        guard let sign = planet(named: "Moon")?.sign else { return nil }
         return ZodiacSign(rawValue: sign.capitalized)
     }
 }
