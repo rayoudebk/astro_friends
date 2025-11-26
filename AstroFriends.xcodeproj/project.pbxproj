@@ -7,6 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		34A92CD92ED76A6500B62712 /* Secrets.template.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD22ED76A6500B62712 /* Secrets.template.swift */; };
+		34A92CDA2ED76A6500B62712 /* GeminiService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD52ED76A6500B62712 /* GeminiService.swift */; };
+		34A92CDB2ED76A6500B62712 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD12ED76A6500B62712 /* Secrets.swift */; };
+		34A92CDC2ED76A6500B62712 /* AstrologyAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */; };
+		34A92CDD2ED76A6500B62712 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD72ED76A6500B62712 /* SupabaseService.swift */; };
+		34A92CDE2ED76A6500B62712 /* OracleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD62ED76A6500B62712 /* OracleManager.swift */; };
 		8FB3E3F52ED607B200DDDCC5 /* AstralCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */; };
 		8FB3E3F72ED607C400DDDCC5 /* CompatibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */; };
 		8FFD09AE2ED60DBF0007B015 /* NatalChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */; };
@@ -24,6 +30,12 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		34A92CD12ED76A6500B62712 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
+		34A92CD22ED76A6500B62712 /* Secrets.template.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.template.swift; sourceTree = "<group>"; };
+		34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AstrologyAPIService.swift; sourceTree = "<group>"; };
+		34A92CD52ED76A6500B62712 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
+		34A92CD62ED76A6500B62712 /* OracleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OracleManager.swift; sourceTree = "<group>"; };
+		34A92CD72ED76A6500B62712 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
 		8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AstralCompatibility.swift; sourceTree = "<group>"; };
 		8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CompatibilityView.swift; sourceTree = "<group>"; };
 		8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NatalChart.swift; sourceTree = "<group>"; };
@@ -53,6 +65,26 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		34A92CD32ED76A6500B62712 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				34A92CD12ED76A6500B62712 /* Secrets.swift */,
+				34A92CD22ED76A6500B62712 /* Secrets.template.swift */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		34A92CD82ED76A6500B62712 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */,
+				34A92CD52ED76A6500B62712 /* GeminiService.swift */,
+				34A92CD62ED76A6500B62712 /* OracleManager.swift */,
+				34A92CD72ED76A6500B62712 /* SupabaseService.swift */,
+			);
+			path = Managers;
+			sourceTree = "<group>";
+		};
 		A10000000000000000000030 = {
 			isa = PBXGroup;
 			children = (
@@ -64,6 +96,8 @@
 		A10000000000000000000031 /* AstroFriendsApp */ = {
 			isa = PBXGroup;
 			children = (
+				34A92CD32ED76A6500B62712 /* Config */,
+				34A92CD82ED76A6500B62712 /* Managers */,
 				A10000000000000000000011 /* AstroFriendsApp.swift */,
 				A10000000000000000000012 /* ContentView.swift */,
 				A10000000000000000000013 /* Assets.xcassets */,
@@ -186,6 +220,12 @@
 			files = (
 				A10000000000000000000001 /* AstroFriendsApp.swift in Sources */,
 				A10000000000000000000002 /* ContentView.swift in Sources */,
+				34A92CD92ED76A6500B62712 /* Secrets.template.swift in Sources */,
+				34A92CDA2ED76A6500B62712 /* GeminiService.swift in Sources */,
+				34A92CDB2ED76A6500B62712 /* Secrets.swift in Sources */,
+				34A92CDC2ED76A6500B62712 /* AstrologyAPIService.swift in Sources */,
+				34A92CDD2ED76A6500B62712 /* SupabaseService.swift in Sources */,
+				34A92CDE2ED76A6500B62712 /* OracleManager.swift in Sources */,
 				A10000000000000000000004 /* Contact.swift in Sources */,
 				8FB3E3F72ED607C400DDDCC5 /* CompatibilityView.swift in Sources */,
 				A10000000000000000000006 /* Horoscope.swift in Sources */,

@@ -42,7 +42,6 @@ struct ContentView: View {
     @State private var isSearchActive = false
     @State private var selectedZodiacSign: ZodiacSign? = nil
     @State private var showingOnboarding = false
-    @State private var isAddingFromOnboarding = false
     @State private var showingHoroscopeDetail = false
     @State private var selectedHoroscopeSign: ZodiacSign = .aries
     @State private var showingZodiacReorder = false
@@ -124,7 +123,6 @@ struct ContentView: View {
                             }
                             
                             Button {
-                                isAddingFromOnboarding = false
                                 showingAddContact = true
                             } label: {
                                 Image(systemName: "plus.circle.fill")
@@ -257,7 +255,7 @@ struct ContentView: View {
             .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddContact) {
-                AddContactView(isFromOnboarding: isAddingFromOnboarding)
+                AddContactView()
             }
             .sheet(isPresented: $showingHoroscopeDetail) {
                 HoroscopeDetailView(sign: selectedHoroscopeSign)
@@ -276,10 +274,6 @@ struct ContentView: View {
                 OnboardingView(isFromOnboarding: true) {
                     hasSeenOnboarding = true
                     showingOnboarding = false
-                    isAddingFromOnboarding = true
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        showingAddContact = true
-                    }
                 }
             }
         }
@@ -448,6 +442,8 @@ struct HoroscopeCardView: View {
 // MARK: - Horoscope Detail View
 struct HoroscopeDetailView: View {
     let sign: ZodiacSign
+    var oracleContent: OracleContent? = nil // Optional AI-generated content
+    
     @Environment(\.dismiss) private var dismiss
     @State private var showingCompatibilitySign: ZodiacSign? = nil
     
@@ -465,6 +461,35 @@ struct HoroscopeDetailView: View {
     
     var transits: [PlanetaryTransit] {
         Horoscope.currentTransits
+    }
+    
+    // Use oracle content if available
+    var displayReading: String {
+        oracleContent?.weeklyReading ?? horoscope.weeklyReading
+    }
+    
+    var displayLoveAdvice: String {
+        oracleContent?.loveAdvice ?? horoscope.loveAdvice
+    }
+    
+    var displayCareerAdvice: String {
+        oracleContent?.careerAdvice ?? horoscope.careerAdvice
+    }
+    
+    var displayMood: String {
+        oracleContent?.mood ?? horoscope.mood
+    }
+    
+    var displayLuckyNumber: Int {
+        oracleContent?.luckyNumber ?? horoscope.luckyNumber
+    }
+    
+    var displayLuckyColor: String {
+        oracleContent?.luckyColor ?? horoscope.luckyColor
+    }
+    
+    var displayCelestialInsight: String {
+        oracleContent?.celestialInsight ?? horoscope.celestialInsight
     }
     
     var body: some View {
@@ -606,22 +631,38 @@ struct HoroscopeDetailView: View {
                     
                     // Weekly Reading
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("This Week's Reading")
-                            .font(.headline)
-                            .foregroundColor(.white)
+                        HStack {
+                            Text("This Week's Reading")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                            
+                            if oracleContent != nil {
+                                Spacer()
+                                HStack(spacing: 4) {
+                                    Image(systemName: "sparkles")
+                                    Text("AI Oracle")
+                                }
+                                .font(.caption2)
+                                .foregroundColor(.yellow)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.yellow.opacity(0.2))
+                                .cornerRadius(8)
+                            }
+                        }
                         
-                        Text(horoscope.weeklyReading)
+                        Text(displayReading)
                             .font(.body)
                             .foregroundColor(.white.opacity(0.8))
                         
-                        if !horoscope.celestialInsight.isEmpty {
+                        if !displayCelestialInsight.isEmpty {
                             Divider()
                                 .background(Color.white.opacity(0.2))
                                 .padding(.vertical, 4)
                             
                             HStack(alignment: .top, spacing: 8) {
                                 Text("✨")
-                                Text(horoscope.celestialInsight)
+                                Text(displayCelestialInsight)
                                     .font(.subheadline)
                                     .foregroundColor(.white.opacity(0.9))
                                     .italic()
@@ -640,7 +681,7 @@ struct HoroscopeDetailView: View {
                                 .font(.headline)
                                 .foregroundColor(.pink)
                             
-                            Text(horoscope.loveAdvice)
+                            Text(displayLoveAdvice)
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.8))
                         }
@@ -654,7 +695,7 @@ struct HoroscopeDetailView: View {
                                 .font(.headline)
                                 .foregroundColor(.cyan)
                             
-                            Text(horoscope.careerAdvice)
+                            Text(displayCareerAdvice)
                                 .font(.caption)
                                 .foregroundColor(.white.opacity(0.8))
                         }
@@ -666,9 +707,9 @@ struct HoroscopeDetailView: View {
                     
                     // Lucky Info
                     HStack(spacing: 12) {
-                        InfoCard(title: "Lucky Number", value: "\(horoscope.luckyNumber)", icon: "number")
-                        InfoCard(title: "Lucky Color", value: horoscope.luckyColor, icon: "paintpalette.fill")
-                        InfoCard(title: "Mood", value: horoscope.mood, icon: "face.smiling.fill")
+                        InfoCard(title: "Lucky Number", value: "\(displayLuckyNumber)", icon: "number")
+                        InfoCard(title: "Lucky Color", value: displayLuckyColor, icon: "paintpalette.fill")
+                        InfoCard(title: "Mood", value: displayMood, icon: "face.smiling.fill")
                     }
                     
                     // Compatibility
@@ -920,27 +961,21 @@ struct OnboardingView: View {
                         .padding(.bottom, 24)
                     }
                     
-                    VStack(spacing: 12) {
-                        Text("Let's start by adding 5 contacts")
-                            .font(.subheadline)
-                            .foregroundColor(.white.opacity(0.6))
-                        
-                        Button(action: onContinue) {
-                            Text("Get started")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(
-                                    LinearGradient(
-                                        colors: [Color.purple, Color.indigo],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
+                    Button(action: onContinue) {
+                        Text("Get started")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(
+                                LinearGradient(
+                                    colors: [Color.purple, Color.indigo],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
                                 )
-                                .foregroundColor(.white)
-                                .cornerRadius(16)
-                                .shadow(color: Color.purple.opacity(0.4), radius: 10, x: 0, y: 5)
-                        }
+                            )
+                            .foregroundColor(.white)
+                            .cornerRadius(16)
+                            .shadow(color: Color.purple.opacity(0.4), radius: 10, x: 0, y: 5)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)

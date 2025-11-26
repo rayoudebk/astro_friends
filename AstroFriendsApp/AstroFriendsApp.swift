@@ -21,26 +21,10 @@ struct AstroFriendsApp: App {
 // Onboarding container to handle the flow
 struct OnboardingContainerView: View {
     @AppStorage("hasSeenOnboarding") private var hasSeenOnboarding = false
-    @State private var showingAddContacts = false
     
     var body: some View {
-        if showingAddContacts {
-            NavigationStack {
-                AddContactView(isFromOnboarding: true)
-                    .navigationBarBackButtonHidden()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") {
-                                hasSeenOnboarding = true
-                            }
-                        }
-                    }
-            }
-            .preferredColorScheme(.dark)
-        } else {
-            OnboardingView(isFromOnboarding: true) {
-                showingAddContacts = true
-            }
+        OnboardingView(isFromOnboarding: true) {
+            hasSeenOnboarding = true
         }
     }
 }

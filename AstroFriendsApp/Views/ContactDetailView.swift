@@ -4,10 +4,14 @@ import SwiftData
 struct ContactDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Bindable var contact: Contact
+    @StateObject private var oracleManager = OracleManager.shared
     
     @State private var showingEditSheet = false
     @State private var showingHoroscope = false
     @State private var showingCompatibility = false
+    @State private var oracleContent: OracleContent?
+    @State private var isLoadingOracle = false
+    @State private var oracleError: String?
     @AppStorage("userZodiacSign") private var userZodiacSign: String = "Aries"
     
     var userSign: ZodiacSign {
@@ -18,8 +22,18 @@ struct ContactDetailView: View {
         AstralCompatibility(person1Sign: userSign, person2Sign: contact.zodiacSign)
     }
     
+    // Fallback to local horoscope if no oracle content
     var horoscope: Horoscope {
         Horoscope.getWeeklyHoroscope(for: contact.zodiacSign)
+    }
+    
+    // Use oracle content if available, else fallback
+    var displayReading: String {
+        oracleContent?.weeklyReading ?? horoscope.weeklyReading
+    }
+    
+    var displayMood: String {
+        oracleContent?.mood ?? horoscope.mood
     }
     
     var body: some View {
@@ -88,12 +102,53 @@ struct ContactDetailView: View {
             EditContactView(contact: contact)
         }
         .sheet(isPresented: $showingHoroscope) {
-            HoroscopeDetailView(sign: contact.zodiacSign)
+            HoroscopeDetailView(sign: contact.zodiacSign, oracleContent: oracleContent)
         }
         .sheet(isPresented: $showingCompatibility) {
             CompatibilityView(contact: contact)
         }
         .preferredColorScheme(.dark)
+        .task {
+            await loadOracleContent()
+        }
+    }
+    
+    // MARK: - Oracle Loading
+    
+    private func loadOracleContent() async {
+        guard !contact.zodiacSign.isMissingInfo else { return }
+        
+        isLoadingOracle = true
+        oracleError = nil
+        
+        // Try to fetch cached content first
+        if let cached = try? await SupabaseService.shared.fetchOracleContent(contactId: contact.id) {
+            oracleContent = cached
+            isLoadingOracle = false
+            return
+        }
+        
+        // No cached content - auto-generate
+        do {
+            oracleContent = try await OracleManager.shared.generateOracleContent(for: contact)
+        } catch {
+            oracleError = error.localizedDescription
+        }
+        
+        isLoadingOracle = false
+    }
+    
+    private func generateFreshOracle() async {
+        isLoadingOracle = true
+        oracleError = nil
+        
+        do {
+            oracleContent = try await OracleManager.shared.generateOracleContent(for: contact)
+        } catch {
+            oracleError = error.localizedDescription
+        }
+        
+        isLoadingOracle = false
     }
     
     private var contactHeaderCard: some View {
@@ -233,57 +288,133 @@ struct ContactDetailView: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Button {
-                    showingHoroscope = true
-                } label: {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text(contact.zodiacSign.emoji)
-                                .font(.title)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Weekly Horoscope")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
+                VStack(spacing: 12) {
+                    Button {
+                        showingHoroscope = true
+                    } label: {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Text(contact.zodiacSign.emoji)
+                                    .font(.title)
                                 
-                                Text(contact.zodiacSign.dateRange)
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.6))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    HStack(spacing: 6) {
+                                        Text("Weekly Horoscope")
+                                            .font(.headline)
+                                            .foregroundColor(.white)
+                                        
+                                        if oracleContent != nil {
+                                            Image(systemName: "sparkles")
+                                                .font(.caption)
+                                                .foregroundColor(.yellow)
+                                        }
+                                    }
+                                    
+                                    Text(contact.zodiacSign.dateRange)
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.6))
+                                }
+                                
+                                Spacer()
+                                
+                                HStack(spacing: 4) {
+                                    if !isLoadingOracle || oracleContent != nil {
+                                        Text(displayMood)
+                                            .font(.caption)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(elementColor(for: contact.zodiacSign).opacity(0.3))
+                                            .foregroundColor(elementColor(for: contact.zodiacSign))
+                                            .cornerRadius(8)
+                                    }
+                                    
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.5))
+                                }
                             }
                             
-                            Spacer()
+                            if isLoadingOracle && oracleContent == nil {
+                                HStack(spacing: 8) {
+                                    ProgressView()
+                                        .tint(.white.opacity(0.5))
+                                        .scaleEffect(0.8)
+                                    Text("Consulting the stars...")
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(0.5))
+                                        .italic()
+                                }
+                            } else {
+                                Text(displayReading)
+                                    .font(.caption)
+                                    .foregroundColor(.white.opacity(0.7))
+                                    .lineLimit(2)
+                            }
                             
-                            HStack(spacing: 4) {
-                                Text(horoscope.mood)
-                                    .font(.caption)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(elementColor(for: contact.zodiacSign).opacity(0.3))
-                                    .foregroundColor(elementColor(for: contact.zodiacSign))
-                                    .cornerRadius(8)
-                                
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.white.opacity(0.5))
+                            // Show oracle extras if available
+                            if let oracle = oracleContent {
+                                HStack(spacing: 12) {
+                                    if let lucky = oracle.luckyNumber {
+                                        Label("\(lucky)", systemImage: "number")
+                                            .font(.caption2)
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                    if let color = oracle.luckyColor {
+                                        Label(color, systemImage: "paintpalette")
+                                            .font(.caption2)
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                }
                             }
                         }
-                        
-                        Text(horoscope.weeklyReading)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.7))
-                            .lineLimit(2)
-                    }
-                    .padding()
-                    .background(
-                        LinearGradient(
-                            colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                        .padding()
+                        .background(
+                            LinearGradient(
+                                colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
                         )
-                    )
-                    .cornerRadius(16)
+                        .cornerRadius(16)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    
+                    // Refresh option (only show when content exists)
+                    if oracleContent != nil && !isLoadingOracle {
+                        Button {
+                            Task {
+                                await generateFreshOracle()
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: "arrow.clockwise")
+                                Text("Refresh Oracle")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.5))
+                        }
+                    }
+                    
+                    // Error display with retry
+                    if let error = oracleError {
+                        VStack(spacing: 8) {
+                            Text(error)
+                                .font(.caption2)
+                                .foregroundColor(.red.opacity(0.8))
+                            
+                            Button {
+                                Task {
+                                    await generateFreshOracle()
+                                }
+                            } label: {
+                                Text("Retry")
+                                    .font(.caption)
+                                    .foregroundColor(.purple)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
                 }
-                .buttonStyle(PlainButtonStyle())
             }
         }
     }

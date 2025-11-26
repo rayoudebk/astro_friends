@@ -9,8 +9,6 @@ struct AddContactView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var existingContacts: [Contact]
     
-    let isFromOnboarding: Bool
-    
     @State private var searchText = ""
     @State private var allContacts: [CNContact] = []
     @State private var selectedContactIds: Set<String> = []
@@ -87,47 +85,6 @@ struct AddContactView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Progress bar during onboarding
-                if isFromOnboarding {
-                    VStack(spacing: 8) {
-                        HStack {
-                            Text("Add 5 contacts to get started")
-                                .font(.subheadline)
-                                .foregroundColor(.white.opacity(0.7))
-                            Spacer()
-                            Text("\(selectedContactIds.count)/5")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(selectedContactIds.count >= 5 ? .green : .purple)
-                        }
-                        .padding(.horizontal)
-                        
-                        GeometryReader { geometry in
-                            ZStack(alignment: .leading) {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.1))
-                                    .frame(height: 8)
-                                    .cornerRadius(4)
-                                
-                                Rectangle()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: selectedContactIds.count >= 5 ? [.green, .mint] : [.purple, .indigo],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
-                                    .frame(width: min(CGFloat(selectedContactIds.count) / 5.0 * geometry.size.width, geometry.size.width), height: 8)
-                                    .cornerRadius(4)
-                                    .animation(.spring(response: 0.3), value: selectedContactIds.count)
-                            }
-                        }
-                        .frame(height: 8)
-                        .padding(.horizontal)
-                    }
-                    .padding(.vertical, 12)
-                }
-                
                 // Instruction header
                 VStack(spacing: 8) {
                     HStack {
@@ -364,6 +321,8 @@ struct AddContactView: View {
     }
     
     private func importContacts() {
+        var newContacts: [Contact] = []
+        
         for identifier in selectedContactIds {
             guard let cnContact = allContacts.first(where: { $0.identifier == identifier }) else { continue }
             
@@ -393,9 +352,28 @@ struct AddContactView: View {
             )
             
             modelContext.insert(contact)
+            newContacts.append(contact)
+        }
+        
+        // Trigger oracle generation in background for contacts with birthdays
+        Task {
+            await generateOraclesForNewContacts(newContacts)
         }
         
         dismiss()
+    }
+    
+    private func generateOraclesForNewContacts(_ contacts: [Contact]) async {
+        for contact in contacts {
+            guard !contact.zodiacSign.isMissingInfo else { continue }
+            
+            do {
+                _ = try await OracleManager.shared.generateOracleContent(for: contact)
+                print("✨ Generated oracle for \(contact.name)")
+            } catch {
+                print("⚠️ Failed to generate oracle for \(contact.name): \(error.localizedDescription)")
+            }
+        }
     }
 }
 
