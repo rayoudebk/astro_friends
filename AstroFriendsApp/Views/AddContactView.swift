@@ -306,42 +306,45 @@ struct AddContactView: View {
     }
     
     private func loadContactsFromStore(_ store: CNContactStore) {
-        let keys = [
-            CNContactGivenNameKey,
-            CNContactFamilyNameKey,
-            CNContactMiddleNameKey,
-            CNContactNicknameKey,
-            CNContactOrganizationNameKey,
-            CNContactJobTitleKey,
-            CNContactPhoneNumbersKey,
-            CNContactEmailAddressesKey,
-            CNContactBirthdayKey,
-            CNContactPostalAddressesKey,
-            CNContactImageDataKey,
-            CNContactThumbnailImageDataKey
-        ] as [CNKeyDescriptor]
-        
-        let request = CNContactFetchRequest(keysToFetch: keys)
-        request.predicate = nil
-        
-        var contacts: [CNContact] = []
-        
-        do {
-            try store.enumerateContacts(with: request) { contact, stop in
-                contacts.append(contact)
-            }
+        // Run contact enumeration on background thread to avoid UI blocking
+        DispatchQueue.global(qos: .userInitiated).async {
+            let keys = [
+                CNContactGivenNameKey,
+                CNContactFamilyNameKey,
+                CNContactMiddleNameKey,
+                CNContactNicknameKey,
+                CNContactOrganizationNameKey,
+                CNContactJobTitleKey,
+                CNContactPhoneNumbersKey,
+                CNContactEmailAddressesKey,
+                CNContactBirthdayKey,
+                CNContactPostalAddressesKey,
+                CNContactImageDataKey,
+                CNContactThumbnailImageDataKey
+            ] as [CNKeyDescriptor]
             
-            DispatchQueue.main.async {
-                self.allContacts = contacts.sorted { c1, c2 in
-                    let name1 = self.contactDisplayName(c1)
-                    let name2 = self.contactDisplayName(c2)
-                    return name1 < name2
+            let request = CNContactFetchRequest(keysToFetch: keys)
+            request.predicate = nil
+            
+            var contacts: [CNContact] = []
+            
+            do {
+                try store.enumerateContacts(with: request) { contact, stop in
+                    contacts.append(contact)
                 }
-                self.isLoadingContacts = false
-            }
-        } catch {
-            DispatchQueue.main.async {
-                self.isLoadingContacts = false
+                
+                DispatchQueue.main.async {
+                    self.allContacts = contacts.sorted { c1, c2 in
+                        let name1 = self.contactDisplayName(c1)
+                        let name2 = self.contactDisplayName(c2)
+                        return name1 < name2
+                    }
+                    self.isLoadingContacts = false
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.isLoadingContacts = false
+                }
             }
         }
     }

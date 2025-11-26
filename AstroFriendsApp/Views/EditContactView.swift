@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import CoreLocation
 
 struct EditContactView: View {
     @Environment(\.dismiss) private var dismiss
@@ -11,8 +12,13 @@ struct EditContactView: View {
     @State private var notes: String = ""
     @State private var zodiacSign: ZodiacSign = .aries
     @State private var isFavorite: Bool = false
-    @State private var birthday: Date = Date()
-    @State private var hasBirthday: Bool = false
+    @State private var birthday: Date? = nil
+    @State private var birthTime: Date? = nil
+    @State private var birthPlace: String = ""
+    @State private var coordinates: CLLocationCoordinate2D? = nil
+    @State private var isGeocodingError: Bool = false
+    
+    private let geocoder = CLGeocoder()
     
     var body: some View {
         NavigationStack {
@@ -26,14 +32,99 @@ struct EditContactView: View {
                         .autocapitalization(.none)
                 }
                 
-                Section("Birthday") {
-                    Toggle("Has Birthday", isOn: $hasBirthday)
-                    
-                    if hasBirthday {
-                        DatePicker("Birthday", selection: $birthday, displayedComponents: .date)
-                            .onChange(of: birthday) { _, newDate in
-                                zodiacSign = ZodiacSign.from(birthday: newDate)
+                Section("Birth Data") {
+                    // Birthday - optional date picker
+                    HStack {
+                        Text("Birthday")
+                        Spacer()
+                        if let bday = birthday {
+                            DatePicker("", selection: Binding(
+                                get: { bday },
+                                set: { newDate in
+                                    birthday = newDate
+                                    zodiacSign = ZodiacSign.from(birthday: newDate)
+                                }
+                            ), displayedComponents: .date)
+                            .labelsHidden()
+                            
+                            Button {
+                                birthday = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
                             }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button("Add") {
+                                birthday = Date()
+                                zodiacSign = ZodiacSign.from(birthday: Date())
+                            }
+                            .foregroundColor(.indigo)
+                        }
+                    }
+                    
+                    // Birth Time - optional time picker
+                    HStack {
+                        Text("Birth Time")
+                        Spacer()
+                        if let time = birthTime {
+                            DatePicker("", selection: Binding(
+                                get: { time },
+                                set: { birthTime = $0 }
+                            ), displayedComponents: .hourAndMinute)
+                            .labelsHidden()
+                            
+                            Button {
+                                birthTime = nil
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            Button("Add") {
+                                // Default to noon
+                                let calendar = Calendar.current
+                                var components = calendar.dateComponents([.year, .month, .day], from: Date())
+                                components.hour = 12
+                                components.minute = 0
+                                birthTime = calendar.date(from: components)
+                            }
+                            .foregroundColor(.indigo)
+                        }
+                    }
+                    
+                    // Birth Place
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextField("Birth City", text: $birthPlace)
+                            .onChange(of: birthPlace) { _, newValue in
+                                if !newValue.isEmpty {
+                                    geocodeCity(newValue)
+                                } else {
+                                    coordinates = nil
+                                    isGeocodingError = false
+                                }
+                            }
+                        
+                        if let coords = coordinates {
+                            HStack {
+                                Image(systemName: "location.fill")
+                                    .foregroundColor(.indigo)
+                                    .font(.caption)
+                                Text(formatCoordinates(coords))
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        } else if isGeocodingError && !birthPlace.isEmpty {
+                            HStack {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundColor(.orange)
+                                    .font(.caption)
+                                Text("Location not found")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                 }
                 
@@ -103,9 +194,13 @@ struct EditContactView: View {
         notes = contact.notes
         zodiacSign = contact.zodiacSign
         isFavorite = contact.isFavorite
-        if let bday = contact.birthday {
-            birthday = bday
-            hasBirthday = true
+        birthday = contact.birthday
+        birthTime = contact.birthTime
+        birthPlace = contact.birthPlace ?? ""
+        
+        // Geocode existing birth place
+        if !birthPlace.isEmpty {
+            geocodeCity(birthPlace)
         }
     }
     
@@ -116,6 +211,37 @@ struct EditContactView: View {
         contact.notes = notes
         contact.zodiacSign = zodiacSign
         contact.isFavorite = isFavorite
-        contact.birthday = hasBirthday ? birthday : nil
+        contact.birthday = birthday
+        contact.birthTime = birthTime
+        contact.birthPlace = birthPlace.isEmpty ? nil : birthPlace
+    }
+    
+    private func geocodeCity(_ city: String) {
+        // Debounce - only geocode after user stops typing
+        let searchCity = city
+        
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // Only proceed if the city hasn't changed
+            guard self.birthPlace == searchCity else { return }
+            
+            geocoder.cancelGeocode()
+            geocoder.geocodeAddressString(city) { placemarks, error in
+                if let location = placemarks?.first?.location {
+                    self.coordinates = location.coordinate
+                    self.isGeocodingError = false
+                } else {
+                    self.coordinates = nil
+                    self.isGeocodingError = true
+                }
+            }
+        }
+    }
+    
+    private func formatCoordinates(_ coord: CLLocationCoordinate2D) -> String {
+        let latDirection = coord.latitude >= 0 ? "N" : "S"
+        let lonDirection = coord.longitude >= 0 ? "E" : "W"
+        return String(format: "%.4f° %@, %.4f° %@", 
+                      abs(coord.latitude), latDirection,
+                      abs(coord.longitude), lonDirection)
     }
 }
