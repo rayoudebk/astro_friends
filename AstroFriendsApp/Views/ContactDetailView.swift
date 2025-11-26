@@ -35,7 +35,7 @@ struct ContactDetailView: View {
                 compatibilityCard
                 
                 // Contact Info
-                if contact.phoneNumber != nil || contact.email != nil || contact.birthday != nil {
+                if contact.phoneNumber != nil || contact.email != nil || contact.birthday != nil || contact.birthTime != nil || contact.birthPlace != nil {
                     contactInfoSection
                 }
                 
@@ -388,6 +388,29 @@ struct ContactDetailView: View {
                             .frame(width: 24)
                         Text(birthday, style: .date)
                             .foregroundColor(.white.opacity(0.9))
+                        Spacer()
+                    }
+                }
+                
+                if let birthTime = contact.birthTime {
+                    HStack {
+                        Image(systemName: "clock.fill")
+                            .foregroundColor(.orange)
+                            .frame(width: 24)
+                        Text(birthTime, format: .dateTime.hour().minute())
+                            .foregroundColor(.white.opacity(0.9))
+                        Spacer()
+                    }
+                }
+                
+                if let birthPlace = contact.birthPlace, !birthPlace.isEmpty {
+                    HStack {
+                        Image(systemName: "mappin.circle.fill")
+                            .foregroundColor(.red)
+                            .frame(width: 24)
+                        Text(birthPlace)
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(2)
                         Spacer()
                     }
                 }
