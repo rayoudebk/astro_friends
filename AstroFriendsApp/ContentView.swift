@@ -23,6 +23,14 @@ struct CosmicTheme {
     static let textMuted = Color.white.opacity(0.5)
 }
 
+// MARK: - Scroll Offset Preference Key
+struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Contact.name) private var contacts: [Contact]
@@ -38,6 +46,10 @@ struct ContentView: View {
     @State private var showingHoroscopeDetail = false
     @State private var selectedHoroscopeSign: ZodiacSign = .aries
     @State private var showingZodiacReorder = false
+    @State private var scrollOffset: CGFloat = 0
+    @State private var initialScrollOffset: CGFloat? = nil
+    @State private var headerVisible: Bool = true
+    @State private var hasScrolledAway: Bool = false
     
     // Get ordered zodiac signs (user can reorder)
     var orderedZodiacSigns: [ZodiacSign] {
@@ -79,6 +91,11 @@ struct ContentView: View {
         return filtered
     }
     
+    // Header height - fully collapse to 0 when hidden
+    private var headerHeight: CGFloat {
+        headerVisible ? 44 : 0
+    }
+    
     var body: some View {
         NavigationStack {
             ZStack {
@@ -87,121 +104,158 @@ struct ContentView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 0) {
-                    
-                    // Horoscope Card - Large featured card
-                    HoroscopeCardView(
-                        selectedSign: selectedZodiacSign,
-                        onSignTap: { sign in
-                            selectedHoroscopeSign = sign
-                            showingHoroscopeDetail = true
+                    // Collapsible Header with icons
+                    if headerVisible {
+                        HStack(spacing: 14) {
+                            Spacer()
+                            
+                            NavigationLink(destination: SettingsView()) {
+                                Image(systemName: "gearshape")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(CosmicTheme.textSecondary)
+                            }
+                            
+                            Button {
+                                isSearchActive.toggle()
+                            } label: {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(isSearchActive ? CosmicTheme.accent : CosmicTheme.textSecondary)
+                            }
+                            
+                            Button {
+                                isAddingFromOnboarding = false
+                                showingAddContact = true
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(CosmicTheme.accent)
+                            }
                         }
-                    )
-                    .padding(.horizontal)
-                    .padding(.bottom, 12)
+                        .padding(.horizontal)
+                        .frame(height: 44)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                     
-                    // Zodiac Sign Filter with reorder button
-                    HStack {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ZodiacFilterButton(
-                                    title: "All",
-                                    isSelected: selectedZodiacSign == nil,
-                                    count: contacts.count
-                                ) {
-                                    selectedZodiacSign = nil
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            // Invisible scroll tracker
+                            Color.clear
+                                .frame(height: 1)
+                                .overlay(
+                                    GeometryReader { geo in
+                                        Color.clear
+                                            .onChange(of: geo.frame(in: .global).minY) { _, newValue in
+                                                if initialScrollOffset == nil {
+                                                    initialScrollOffset = newValue
+                                                }
+                                                let offset = newValue - (initialScrollOffset ?? 0)
+                                                scrollOffset = offset
+                                                
+                                                // Hide when scrolling down past threshold
+                                                if offset < -30 && !hasScrolledAway {
+                                                    withAnimation(.easeOut(duration: 0.25)) {
+                                                        hasScrolledAway = true
+                                                        headerVisible = false
+                                                    }
+                                                }
+                                                
+                                                // Show only when at top AND pulling down (overscroll)
+                                                if offset > 15 && hasScrolledAway {
+                                                    withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                                                        hasScrolledAway = false
+                                                        headerVisible = true
+                                                    }
+                                                }
+                                            }
+                                            .onAppear {
+                                                initialScrollOffset = geo.frame(in: .global).minY
+                                            }
+                                    }
+                                )
+                            
+                            // Horoscope Card - Large featured card
+                            HoroscopeCardView(
+                                selectedSign: selectedZodiacSign,
+                                onSignTap: { sign in
+                                    selectedHoroscopeSign = sign
+                                    showingHoroscopeDetail = true
+                                }
+                            )
+                            .padding(.horizontal)
+                            .padding(.bottom, 12)
+                            
+                            // Zodiac Sign Filter with reorder button
+                            HStack {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ZodiacFilterButton(
+                                            title: "All",
+                                            isSelected: selectedZodiacSign == nil,
+                                            count: contacts.count
+                                        ) {
+                                            selectedZodiacSign = nil
+                                        }
+                                        
+                                        ForEach(orderedZodiacSigns, id: \.self) { sign in
+                                            ZodiacFilterButton(
+                                                title: sign.rawValue,
+                                                isSelected: selectedZodiacSign == sign,
+                                                count: contacts.filter { $0.zodiacSign == sign }.count
+                                            ) {
+                                                selectedZodiacSign = sign
+                                            }
+                                        }
+                                    }
+                                    .padding(.horizontal)
                                 }
                                 
-                                ForEach(orderedZodiacSigns, id: \.self) { sign in
-                                    ZodiacFilterButton(
-                                        title: sign.rawValue,
-                                        isSelected: selectedZodiacSign == sign,
-                                        count: contacts.filter { $0.zodiacSign == sign }.count
-                                    ) {
-                                        selectedZodiacSign = sign
-                                    }
+                                Button {
+                                    showingZodiacReorder = true
+                                } label: {
+                                    Image(systemName: "arrow.up.arrow.down")
+                                        .font(.caption)
+                                        .foregroundColor(CosmicTheme.textMuted)
+                                        .padding(8)
+                                        .background(CosmicTheme.cardBackground)
+                                        .clipShape(Circle())
                                 }
+                                .padding(.trailing)
                             }
-                            .padding(.horizontal)
-                        }
-                        
-                        Button {
-                            showingZodiacReorder = true
-                        } label: {
-                            Image(systemName: "arrow.up.arrow.down")
-                                .font(.caption)
-                                .foregroundColor(CosmicTheme.textMuted)
-                                .padding(8)
-                                .background(CosmicTheme.cardBackground)
-                                .clipShape(Circle())
-                        }
-                        .padding(.trailing)
-                    }
-                    .padding(.bottom, 8)
-                    
-                    // Contacts List
-                    if filteredContacts.isEmpty {
-                        EmptyStateView(hasContacts: !contacts.isEmpty)
-                    } else {
-                        List {
-                            ForEach(filteredContacts) { contact in
-                                ZStack {
-                                    NavigationLink(destination: ContactDetailView(contact: contact)) {
-                                        EmptyView()
-                                    }
-                                    .opacity(0)
-                                    
-                                    ContactRowView(contact: contact)
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                    Button(role: .destructive) {
-                                        withAnimation {
-                                            modelContext.delete(contact)
+                            .padding(.bottom, 8)
+                            
+                            // Contacts List
+                            if filteredContacts.isEmpty {
+                                EmptyStateView(hasContacts: !contacts.isEmpty)
+                                    .padding(.top, 40)
+                            } else {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(filteredContacts) { contact in
+                                        NavigationLink(destination: ContactDetailView(contact: contact)) {
+                                            ContactRowView(contact: contact)
                                         }
-                                    } label: {
-                                        Image(systemName: "trash")
+                                        .buttonStyle(.plain)
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                withAnimation {
+                                                    modelContext.delete(contact)
+                                                }
+                                            } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                                .padding(.horizontal, 16)
                             }
                         }
-                        .listStyle(.plain)
-                        .scrollContentBackground(.hidden)
                     }
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationTitle("")
             .toolbarBackground(.hidden, for: .navigationBar)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    HStack(spacing: 14) {
-                        NavigationLink(destination: SettingsView()) {
-                            Image(systemName: "gearshape")
-                                .font(.body)
-                                .foregroundColor(CosmicTheme.textSecondary)
-                        }
-                        
-                        Button {
-                            isSearchActive.toggle()
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                                .font(.body)
-                                .foregroundColor(isSearchActive ? CosmicTheme.accent : CosmicTheme.textSecondary)
-                        }
-                        
-                        Button {
-                            isAddingFromOnboarding = false
-                            showingAddContact = true
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.body)
-                                .foregroundColor(CosmicTheme.accent)
-                        }
-                    }
-                }
-            }
+            .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingAddContact) {
                 AddContactView(isFromOnboarding: isAddingFromOnboarding)
             }
