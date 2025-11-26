@@ -4,17 +4,16 @@ import SwiftData
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var contacts: [Contact]
-    @Query private var checkIns: [CheckIn]
     
     @State private var showingExportSuccess = false
     @State private var showingDeleteConfirmation = false
     
     var body: some View {
-        Form {
+        List {
             Section("About") {
                 HStack {
                     Image(systemName: "sparkles")
-                        .foregroundColor(.indigo)
+                        .foregroundColor(.purple)
                     Text("Astro Friends")
                     Spacer()
                     Text("1.0")
@@ -23,19 +22,10 @@ struct SettingsView: View {
                 
                 HStack {
                     Image(systemName: "person.2.fill")
-                        .foregroundColor(.indigo)
+                        .foregroundColor(.purple)
                     Text("Total Contacts")
                     Spacer()
                     Text("\(contacts.count)")
-                        .foregroundColor(.secondary)
-                }
-                
-                HStack {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.indigo)
-                    Text("Total Check-ins")
-                    Spacer()
-                    Text("\(checkIns.count)")
                         .foregroundColor(.secondary)
                 }
             }
@@ -70,12 +60,8 @@ struct SettingsView: View {
             }
             
             Section("Support") {
-                Link(destination: URL(string: "https://github.com")!) {
+                Link(destination: URL(string: "https://github.com/rayoudebk/astro_friends")!) {
                     Label("GitHub", systemImage: "link")
-                }
-                
-                Link(destination: URL(string: "mailto:support@astrofriends.app")!) {
-                    Label("Contact Support", systemImage: "envelope")
                 }
             }
         }
@@ -83,7 +69,7 @@ struct SettingsView: View {
         .alert("Export Successful", isPresented: $showingExportSuccess) {
             Button("OK") {}
         } message: {
-            Text("Your data has been exported.")
+            Text("Your data has been copied to clipboard.")
         }
         .alert("Delete All Data?", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) {}
@@ -91,19 +77,17 @@ struct SettingsView: View {
                 deleteAllData()
             }
         } message: {
-            Text("This will permanently delete all contacts and check-ins. This cannot be undone.")
+            Text("This will permanently delete all contacts. This cannot be undone.")
         }
     }
     
     private func exportData() {
-        // Create export data structure
         var exportDict: [[String: Any]] = []
         
         for contact in contacts {
             var contactDict: [String: Any] = [
                 "name": contact.name,
                 "zodiacSign": contact.zodiacSign.rawValue,
-                "frequencyDays": contact.frequencyDays,
                 "isFavorite": contact.isFavorite,
                 "notes": contact.notes
             ]
@@ -120,17 +104,11 @@ struct SettingsView: View {
                 contactDict["birthday"] = ISO8601DateFormatter().string(from: birthday)
             }
             
-            if let lastCheckIn = contact.lastCheckInDate {
-                contactDict["lastCheckIn"] = ISO8601DateFormatter().string(from: lastCheckIn)
-            }
-            
             exportDict.append(contactDict)
         }
         
-        // Convert to JSON
         if let jsonData = try? JSONSerialization.data(withJSONObject: exportDict, options: .prettyPrinted),
            let jsonString = String(data: jsonData, encoding: .utf8) {
-            // Copy to clipboard
             UIPasteboard.general.string = jsonString
             showingExportSuccess = true
         }
@@ -140,11 +118,5 @@ struct SettingsView: View {
         for contact in contacts {
             modelContext.delete(contact)
         }
-        
-        for checkIn in checkIns {
-            modelContext.delete(checkIn)
-        }
     }
 }
-
-

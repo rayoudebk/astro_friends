@@ -6,7 +6,6 @@ struct ContactDetailView: View {
     @Bindable var contact: Contact
     
     @State private var showingEditSheet = false
-    @State private var showingCheckInSheet = false
     @State private var showingHoroscope = false
     @State private var showingCompatibility = false
     @AppStorage("userZodiacSign") private var userZodiacSign: String = "Aries"
@@ -36,12 +35,9 @@ struct ContactDetailView: View {
                 compatibilityCard
                 
                 // Contact Info
-                if contact.phoneNumber != nil || contact.email != nil {
+                if contact.phoneNumber != nil || contact.email != nil || contact.birthday != nil {
                     contactInfoSection
                 }
-                
-                // Check-in History
-                checkInHistorySection
                 
                 // Notes
                 if !contact.notes.isEmpty {
@@ -50,8 +46,17 @@ struct ContactDetailView: View {
             }
             .padding()
         }
+        .background(
+            LinearGradient(
+                colors: [Color(red: 0.05, green: 0.05, blue: 0.12), Color(red: 0.08, green: 0.04, blue: 0.18)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+        )
         .navigationTitle(contact.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu {
@@ -75,14 +80,12 @@ struct ContactDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                        .foregroundColor(.white)
                 }
             }
         }
         .sheet(isPresented: $showingEditSheet) {
             EditContactView(contact: contact)
-        }
-        .sheet(isPresented: $showingCheckInSheet) {
-            CheckInSheetView(contact: contact)
         }
         .sheet(isPresented: $showingHoroscope) {
             HoroscopeDetailView(sign: contact.zodiacSign)
@@ -90,6 +93,7 @@ struct ContactDetailView: View {
         .sheet(isPresented: $showingCompatibility) {
             CompatibilityView(contact: contact)
         }
+        .preferredColorScheme(.dark)
     }
     
     private var contactHeaderCard: some View {
@@ -103,9 +107,26 @@ struct ContactDetailView: View {
                         .scaledToFill()
                         .frame(width: 100, height: 100)
                         .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(
+                                    LinearGradient(
+                                        colors: [elementColor(for: contact.zodiacSign), elementColor(for: contact.zodiacSign).opacity(0.3)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    ),
+                                    lineWidth: 3
+                                )
+                        )
                 } else {
                     Circle()
-                        .fill(elementColor(for: contact.zodiacSign).opacity(0.2))
+                        .fill(
+                            LinearGradient(
+                                colors: [elementColor(for: contact.zodiacSign).opacity(0.4), elementColor(for: contact.zodiacSign).opacity(0.1)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
                         .frame(width: 100, height: 100)
                     
                     Text(contact.name.prefix(1).uppercased())
@@ -115,12 +136,13 @@ struct ContactDetailView: View {
                 }
             }
             
-            // Name and status
+            // Name
             VStack(spacing: 8) {
                 HStack {
                     Text(contact.name)
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundColor(.white)
                     
                     if contact.isFavorite {
                         Image(systemName: "star.fill")
@@ -128,37 +150,23 @@ struct ContactDetailView: View {
                     }
                 }
                 
-                // Status
-                if contact.isOverdue {
-                    Label("Waiting for you", systemImage: "exclamationmark.circle.fill")
-                        .font(.subheadline)
-                        .foregroundColor(.indigo)
-                } else if let lastCheckIn = contact.lastCheckInDate {
-                    Text("Last check-in: \(lastCheckIn, style: .relative) ago")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("No check-ins yet")
-                        .font(.subheadline)
-                        .foregroundColor(.orange)
+                // Zodiac badge
+                HStack(spacing: 6) {
+                    Text(contact.zodiacSign.emoji)
+                    Text(contact.zodiacSign.rawValue)
+                        .fontWeight(.medium)
+                    Text("•")
+                        .foregroundColor(.white.opacity(0.4))
+                    Text(contact.zodiacSign.element)
+                        .foregroundColor(elementColor(for: contact.zodiacSign))
                 }
-            }
-            
-            // Check-in button
-            Button {
-                showingCheckInSheet = true
-            } label: {
-                Label("Record Check-in", systemImage: "checkmark.circle.fill")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(Color.indigo)
-                    .foregroundColor(.white)
-                    .cornerRadius(12)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
             }
         }
         .padding()
-        .background(Color(UIColor.secondarySystemBackground))
+        .frame(maxWidth: .infinity)
+        .background(Color.white.opacity(0.08))
         .cornerRadius(20)
     }
     
@@ -172,13 +180,13 @@ struct ContactDetailView: View {
                         .font(.title)
                     
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(contact.zodiacSign.rawValue)
+                        Text("Weekly Horoscope")
                             .font(.headline)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                         
                         Text(contact.zodiacSign.dateRange)
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.6))
                     }
                     
                     Spacer()
@@ -188,23 +196,29 @@ struct ContactDetailView: View {
                             .font(.caption)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(elementColor(for: contact.zodiacSign).opacity(0.2))
+                            .background(elementColor(for: contact.zodiacSign).opacity(0.3))
                             .foregroundColor(elementColor(for: contact.zodiacSign))
                             .cornerRadius(8)
                         
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.5))
                     }
                 }
                 
-                Text("This week: \(horoscope.weeklyReading)")
+                Text(horoscope.weeklyReading)
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.7))
                     .lineLimit(2)
             }
             .padding()
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(
+                LinearGradient(
+                    colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
             .cornerRadius(16)
         }
         .buttonStyle(PlainButtonStyle())
@@ -220,7 +234,13 @@ struct ContactDetailView: View {
                     HStack(spacing: -8) {
                         ZStack {
                             Circle()
-                                .fill(elementColor(for: userSign).opacity(0.3))
+                                .fill(
+                                    LinearGradient(
+                                        colors: [elementColor(for: userSign), elementColor(for: userSign).opacity(0.5)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                                 .frame(width: 36, height: 36)
                             Text(userSign.emoji)
                                 .font(.title3)
@@ -228,7 +248,13 @@ struct ContactDetailView: View {
                         
                         ZStack {
                             Circle()
-                                .fill(elementColor(for: contact.zodiacSign).opacity(0.3))
+                                .fill(
+                                    LinearGradient(
+                                        colors: [elementColor(for: contact.zodiacSign), elementColor(for: contact.zodiacSign).opacity(0.5)],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
                                 .frame(width: 36, height: 36)
                             Text(contact.zodiacSign.emoji)
                                 .font(.title3)
@@ -238,11 +264,11 @@ struct ContactDetailView: View {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Your Compatibility")
                             .font(.headline)
-                            .foregroundColor(.primary)
+                            .foregroundColor(.white)
                         
                         Text("\(userSign.rawValue) + \(contact.zodiacSign.rawValue)")
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.6))
                     }
                     
                     Spacer()
@@ -257,20 +283,20 @@ struct ContactDetailView: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
-                    .background(harmonyBadgeColor.opacity(0.2))
+                    .background(harmonyBadgeColor.opacity(0.3))
                     .foregroundColor(harmonyBadgeColor)
                     .cornerRadius(10)
                     
                     Image(systemName: "chevron.right")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.5))
                 }
                 
                 // Poetic summary preview
                 Text(compatibility.poeticSummary)
                     .font(.caption)
                     .italic()
-                    .foregroundColor(.secondary)
+                    .foregroundColor(.white.opacity(0.7))
                     .lineLimit(2)
                 
                 // Harmony level description
@@ -281,17 +307,17 @@ struct ContactDetailView: View {
                         .foregroundColor(harmonyBadgeColor)
                     
                     Text("•")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.3))
                     
-                    Text("Tap to explore your cosmic connection")
+                    Text("Tap to explore")
                         .font(.caption)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.5))
                 }
             }
             .padding()
             .background(
                 LinearGradient(
-                    colors: [harmonyBadgeColor.opacity(0.1), Color(UIColor.secondarySystemBackground)],
+                    colors: [harmonyBadgeColor.opacity(0.15), Color.white.opacity(0.05)],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
@@ -305,7 +331,7 @@ struct ContactDetailView: View {
         switch compatibility.harmonyLevel {
         case .soulmates: return .yellow
         case .deepConnection: return .purple
-        case .harmoniousFlow: return .blue
+        case .harmoniousFlow: return .cyan
         case .growthPartners: return .green
         case .dynamicTension: return .orange
         }
@@ -315,6 +341,7 @@ struct ContactDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Contact Info")
                 .font(.headline)
+                .foregroundColor(.white)
             
             VStack(spacing: 12) {
                 if let phone = contact.phoneNumber {
@@ -323,16 +350,17 @@ struct ContactDetailView: View {
                             .foregroundColor(.green)
                             .frame(width: 24)
                         Text(phone)
+                            .foregroundColor(.white.opacity(0.9))
                         Spacer()
                         
                         Link(destination: URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))")!) {
                             Image(systemName: "phone.arrow.up.right")
-                                .foregroundColor(.indigo)
+                                .foregroundColor(.purple)
                         }
                         
                         Link(destination: URL(string: "sms:\(phone.replacingOccurrences(of: " ", with: ""))")!) {
                             Image(systemName: "message.fill")
-                                .foregroundColor(.indigo)
+                                .foregroundColor(.purple)
                         }
                     }
                 }
@@ -340,14 +368,15 @@ struct ContactDetailView: View {
                 if let email = contact.email {
                     HStack {
                         Image(systemName: "envelope.fill")
-                            .foregroundColor(.blue)
+                            .foregroundColor(.cyan)
                             .frame(width: 24)
                         Text(email)
+                            .foregroundColor(.white.opacity(0.9))
                         Spacer()
                         
                         Link(destination: URL(string: "mailto:\(email)")!) {
                             Image(systemName: "arrow.up.right")
-                                .foregroundColor(.indigo)
+                                .foregroundColor(.purple)
                         }
                     }
                 }
@@ -358,77 +387,14 @@ struct ContactDetailView: View {
                             .foregroundColor(.pink)
                             .frame(width: 24)
                         Text(birthday, style: .date)
+                            .foregroundColor(.white.opacity(0.9))
                         Spacer()
                     }
                 }
             }
             .padding()
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(Color.white.opacity(0.08))
             .cornerRadius(16)
-        }
-    }
-    
-    private var checkInHistorySection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("Check-in History")
-                    .font(.headline)
-                Spacer()
-                Text("Every \(contact.frequencyDays) days")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            if let checkIns = contact.checkIns, !checkIns.isEmpty {
-                VStack(spacing: 0) {
-                    ForEach(checkIns.sorted(by: { $0.date > $1.date }).prefix(5)) { checkIn in
-                        HStack {
-                            Image(systemName: checkIn.type.icon)
-                                .foregroundColor(.indigo)
-                                .frame(width: 24)
-                            
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(checkIn.type.rawValue)
-                                    .font(.subheadline)
-                                
-                                Text(checkIn.date, style: .relative)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            
-                            Spacer()
-                            
-                            if !checkIn.notes.isEmpty {
-                                Image(systemName: "note.text")
-                                    .foregroundColor(.secondary)
-                                    .font(.caption)
-                            }
-                        }
-                        .padding(.vertical, 8)
-                        
-                        if checkIn.id != checkIns.sorted(by: { $0.date > $1.date }).prefix(5).last?.id {
-                            Divider()
-                        }
-                    }
-                }
-                .padding()
-                .background(Color(UIColor.secondarySystemBackground))
-                .cornerRadius(16)
-            } else {
-                VStack(spacing: 12) {
-                    Image(systemName: "clock.badge.questionmark")
-                        .font(.title)
-                        .foregroundColor(.secondary)
-                    
-                    Text("No check-ins yet")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color(UIColor.secondarySystemBackground))
-                .cornerRadius(16)
-            }
         }
     }
     
@@ -436,26 +402,25 @@ struct ContactDetailView: View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Notes")
                 .font(.headline)
+                .foregroundColor(.white)
             
             Text(contact.notes)
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.8))
                 .padding()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(UIColor.secondarySystemBackground))
+                .background(Color.white.opacity(0.08))
                 .cornerRadius(16)
         }
     }
     
     private func elementColor(for sign: ZodiacSign) -> Color {
         switch sign.element {
-        case "Fire": return .red
+        case "Fire": return .orange
         case "Earth": return .green
         case "Air": return .purple
-        case "Water": return .blue
+        case "Water": return .cyan
         default: return .gray
         }
     }
 }
-
-

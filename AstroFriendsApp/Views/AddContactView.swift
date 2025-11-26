@@ -13,12 +13,9 @@ struct AddContactView: View {
     
     @State private var searchText = ""
     @State private var allContacts: [CNContact] = []
-    @State private var contactFrequencyMap: [String: Int] = [:]
+    @State private var selectedContactIds: Set<String> = []
     @State private var contactZodiacMap: [String: ZodiacSign] = [:]
     @State private var isLoadingContacts = false
-    @State private var selectedFrequency: Int? = 7
-    
-    let frequencyOptions = [7, 30, 90, 365]
     
     var availableContacts: [CNContact] {
         let existingIdentifiers = Set(existingContacts.compactMap { $0.contactIdentifier })
@@ -28,16 +25,13 @@ struct AddContactView: View {
     var filteredContacts: [CNContact] {
         let available = availableContacts
         
-        let searchFiltered = searchText.isEmpty ? available : available.filter { contact in
-            let name = contactDisplayName(contact)
-            return name.localizedCaseInsensitiveContains(searchText)
+        if searchText.isEmpty {
+            return available
         }
         
-        return searchFiltered.filter { contact in
-            if let assignedFrequency = contactFrequencyMap[contact.identifier] {
-                return assignedFrequency == selectedFrequency
-            }
-            return true
+        return available.filter { contact in
+            let name = contactDisplayName(contact)
+            return name.localizedCaseInsensitiveContains(searchText)
         }
     }
     
@@ -79,7 +73,7 @@ struct AddContactView: View {
         if hasNickname { score += 3 }
         if hasEmail { score += 8 }
         if hasOrganization { score += 6 }
-        if hasBirthday { score += 10 } // Higher score for contacts with birthday
+        if hasBirthday { score += 10 }
         if hasAddress { score += 3 }
         if totalWaysToReach >= 2 { score += 4 }
         
@@ -90,231 +84,199 @@ struct AddContactView: View {
         return score
     }
     
-    var selectedContacts: [ContactSelection] {
-        contactFrequencyMap.compactMap { (identifier, frequencyDays) in
-            guard let cnContact = allContacts.first(where: { $0.identifier == identifier }) else { return nil }
-            return ContactSelection(
-                identifier: identifier,
-                cnContact: cnContact,
-                frequencyDays: frequencyDays,
-                zodiacSign: contactZodiacMap[identifier]
-            )
-        }
-    }
-    
-    func contactCount(for frequency: Int) -> Int {
-        contactFrequencyMap.values.filter { $0 == frequency }.count
-    }
-    
-    func frequencyLabel(for days: Int) -> String {
-        switch days {
-        case 7: return "Weekly"
-        case 30: return "Monthly"
-        case 90: return "Quarterly"
-        case 365: return "Yearly"
-        default: return "\(days) Days"
-        }
-    }
-    
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                selectContactsStep
+                // Progress bar during onboarding
+                if isFromOnboarding {
+                    VStack(spacing: 8) {
+                        HStack {
+                            Text("Add 5 contacts to get started")
+                                .font(.subheadline)
+                                .foregroundColor(.white.opacity(0.7))
+                            Spacer()
+                            Text("\(selectedContactIds.count)/5")
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .foregroundColor(selectedContactIds.count >= 5 ? .green : .purple)
+                        }
+                        .padding(.horizontal)
+                        
+                        GeometryReader { geometry in
+                            ZStack(alignment: .leading) {
+                                Rectangle()
+                                    .fill(Color.white.opacity(0.1))
+                                    .frame(height: 8)
+                                    .cornerRadius(4)
+                                
+                                Rectangle()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: selectedContactIds.count >= 5 ? [.green, .mint] : [.purple, .indigo],
+                                            startPoint: .leading,
+                                            endPoint: .trailing
+                                        )
+                                    )
+                                    .frame(width: min(CGFloat(selectedContactIds.count) / 5.0 * geometry.size.width, geometry.size.width), height: 8)
+                                    .cornerRadius(4)
+                                    .animation(.spring(response: 0.3), value: selectedContactIds.count)
+                            }
+                        }
+                        .frame(height: 8)
+                        .padding(.horizontal)
+                    }
+                    .padding(.vertical, 12)
+                }
+                
+                // Instruction header
+                VStack(spacing: 8) {
+                    HStack {
+                        Text("Select contacts to add")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        Spacer()
+                        Text("\(selectedContactIds.count) selected")
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+                    .padding(.horizontal)
+                    
+                    Text("Zodiac signs will be auto-detected from birthdays")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.5))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
+                }
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.05))
+                
+                // Search bar
+                SearchBar(text: $searchText)
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                
+                // Contact list
+                if isLoadingContacts {
+                    VStack {
+                        Spacer()
+                        ProgressView("Loading contacts...")
+                            .foregroundColor(.white)
+                        Spacer()
+                    }
+                } else if filteredContacts.isEmpty {
+                    VStack(spacing: 16) {
+                        Spacer()
+                        Image(systemName: "person.crop.circle.badge.questionmark")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.3))
+                        Text("No contacts found")
+                            .font(.headline)
+                            .foregroundColor(.white.opacity(0.7))
+                        
+                        Button("Reload Contacts") {
+                            loadContacts()
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else {
+                    List {
+                        if !suggestedContacts.isEmpty {
+                            Section {
+                                ForEach(suggestedContacts, id: \.identifier) { cnContact in
+                                    ContactSelectionRow(
+                                        cnContact: cnContact,
+                                        isSelected: selectedContactIds.contains(cnContact.identifier),
+                                        zodiacSign: contactZodiacMap[cnContact.identifier],
+                                        onToggle: { isSelected in
+                                            if isSelected {
+                                                selectedContactIds.insert(cnContact.identifier)
+                                                if let birthday = cnContact.birthday?.date {
+                                                    contactZodiacMap[cnContact.identifier] = ZodiacSign.from(birthday: birthday)
+                                                }
+                                            } else {
+                                                selectedContactIds.remove(cnContact.identifier)
+                                                contactZodiacMap.removeValue(forKey: cnContact.identifier)
+                                            }
+                                        },
+                                        onZodiacChange: { sign in
+                                            contactZodiacMap[cnContact.identifier] = sign
+                                        }
+                                    )
+                                }
+                            } header: {
+                                Text("Suggested")
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            .listRowBackground(Color.white.opacity(0.05))
+                        }
+                        
+                        if !otherContacts.isEmpty {
+                            Section {
+                                ForEach(otherContacts, id: \.identifier) { cnContact in
+                                    ContactSelectionRow(
+                                        cnContact: cnContact,
+                                        isSelected: selectedContactIds.contains(cnContact.identifier),
+                                        zodiacSign: contactZodiacMap[cnContact.identifier],
+                                        onToggle: { isSelected in
+                                            if isSelected {
+                                                selectedContactIds.insert(cnContact.identifier)
+                                                if let birthday = cnContact.birthday?.date {
+                                                    contactZodiacMap[cnContact.identifier] = ZodiacSign.from(birthday: birthday)
+                                                }
+                                            } else {
+                                                selectedContactIds.remove(cnContact.identifier)
+                                                contactZodiacMap.removeValue(forKey: cnContact.identifier)
+                                            }
+                                        },
+                                        onZodiacChange: { sign in
+                                            contactZodiacMap[cnContact.identifier] = sign
+                                        }
+                                    )
+                                }
+                            } header: {
+                                Text("All contacts")
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            .listRowBackground(Color.white.opacity(0.05))
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
+                }
             }
+            .background(
+                LinearGradient(
+                    colors: [Color(red: 0.05, green: 0.05, blue: 0.12), Color(red: 0.08, green: 0.04, blue: 0.18)],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            )
             .navigationTitle("Add Contacts")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
                         dismiss()
                     }
+                    .foregroundColor(.white)
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         importContacts()
                     }
-                    .disabled(selectedContacts.isEmpty)
+                    .disabled(selectedContactIds.isEmpty)
+                    .foregroundColor(selectedContactIds.isEmpty ? .white.opacity(0.3) : .purple)
                 }
             }
             .onAppear {
                 loadContacts()
             }
         }
-    }
-    
-    private var selectContactsStep: some View {
-        VStack(spacing: 0) {
-            // Progress bar during onboarding
-            if isFromOnboarding {
-                VStack(spacing: 8) {
-                    HStack {
-                        Text("Add 5 contacts to get started")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        Spacer()
-                        Text("\(selectedContacts.count)/5")
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                            .foregroundColor(selectedContacts.count >= 5 ? .green : .indigo)
-                    }
-                    .padding(.horizontal)
-                    
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .fill(Color(UIColor.secondarySystemBackground))
-                                .frame(height: 8)
-                                .cornerRadius(4)
-                            
-                            Rectangle()
-                                .fill(selectedContacts.count >= 5 ? Color.green : Color.indigo)
-                                .frame(width: min(CGFloat(selectedContacts.count) / 5.0 * geometry.size.width, geometry.size.width), height: 8)
-                                .cornerRadius(4)
-                                .animation(.spring(response: 0.3), value: selectedContacts.count)
-                        }
-                    }
-                    .frame(height: 8)
-                    .padding(.horizontal)
-                }
-                .padding(.vertical, 12)
-                .background(Color(UIColor.systemBackground))
-            }
-            
-            // Frequency selection
-            VStack(spacing: 12) {
-                HStack {
-                    Text("Set how often you want to catch up")
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    Spacer()
-                }
-                .padding(.horizontal)
-                
-                HStack(spacing: 12) {
-                    ForEach(frequencyOptions, id: \.self) { frequency in
-                        FrequencyButton(
-                            frequency: frequency,
-                            label: frequencyLabel(for: frequency),
-                            isSelected: selectedFrequency == frequency,
-                            count: contactCount(for: frequency),
-                            onTap: {
-                                if selectedFrequency == frequency {
-                                    selectedFrequency = nil
-                                } else {
-                                    selectedFrequency = frequency
-                                }
-                            }
-                        )
-                    }
-                }
-                .padding(.horizontal)
-            }
-            .padding(.vertical, 16)
-            .background(Color(UIColor.secondarySystemBackground))
-            
-            // Search bar
-            SearchBar(text: $searchText)
-                .padding(.horizontal)
-                .padding(.vertical, 8)
-            
-            // Contact list
-            if isLoadingContacts {
-                ProgressView("Loading contacts...")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if selectedFrequency == nil {
-                VStack(spacing: 16) {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 60))
-                        .foregroundColor(.secondary)
-                    Text("Select a frequency above to assign contacts")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                    
-                    if !allContacts.isEmpty {
-                        Text("\(allContacts.count) contacts ready to assign")
-                            .font(.subheadline)
-                            .foregroundColor(.indigo)
-                            .padding(.top, 8)
-                    }
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if filteredContacts.isEmpty {
-                VStack(spacing: 16) {
-                    Image(systemName: "person.crop.circle.badge.questionmark")
-                        .font(.system(size: 60))
-                        .foregroundColor(.secondary)
-                    Text("No contacts found")
-                        .font(.headline)
-                        .foregroundColor(.secondary)
-                    
-                    Button("Reload Contacts") {
-                        loadContacts()
-                    }
-                    .buttonStyle(.bordered)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                List {
-                    if !suggestedContacts.isEmpty {
-                        Section("Suggested contacts") {
-                            ForEach(suggestedContacts, id: \.identifier) { cnContact in
-                                ContactFrequencyRow(
-                                    cnContact: cnContact,
-                                    selectedFrequency: selectedFrequency!,
-                                    isSelected: contactFrequencyMap[cnContact.identifier] == selectedFrequency,
-                                    zodiacSign: contactZodiacMap[cnContact.identifier],
-                                    onToggle: { isSelected in
-                                        if isSelected {
-                                            contactFrequencyMap[cnContact.identifier] = selectedFrequency!
-                                            // Auto-detect zodiac from birthday
-                                            if let birthday = cnContact.birthday?.date {
-                                                contactZodiacMap[cnContact.identifier] = ZodiacSign.from(birthday: birthday)
-                                            }
-                                        } else {
-                                            contactFrequencyMap.removeValue(forKey: cnContact.identifier)
-                                            contactZodiacMap.removeValue(forKey: cnContact.identifier)
-                                        }
-                                    },
-                                    onZodiacChange: { sign in
-                                        contactZodiacMap[cnContact.identifier] = sign
-                                    }
-                                )
-                            }
-                        }
-                    }
-                    
-                    if !otherContacts.isEmpty {
-                        Section("Other contacts") {
-                            ForEach(otherContacts, id: \.identifier) { cnContact in
-                                ContactFrequencyRow(
-                                    cnContact: cnContact,
-                                    selectedFrequency: selectedFrequency!,
-                                    isSelected: contactFrequencyMap[cnContact.identifier] == selectedFrequency,
-                                    zodiacSign: contactZodiacMap[cnContact.identifier],
-                                    onToggle: { isSelected in
-                                        if isSelected {
-                                            contactFrequencyMap[cnContact.identifier] = selectedFrequency!
-                                            if let birthday = cnContact.birthday?.date {
-                                                contactZodiacMap[cnContact.identifier] = ZodiacSign.from(birthday: birthday)
-                                            }
-                                        } else {
-                                            contactFrequencyMap.removeValue(forKey: cnContact.identifier)
-                                            contactZodiacMap.removeValue(forKey: cnContact.identifier)
-                                        }
-                                    },
-                                    onZodiacChange: { sign in
-                                        contactZodiacMap[cnContact.identifier] = sign
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-                .listStyle(.plain)
-            }
-        }
+        .preferredColorScheme(.dark)
     }
     
     private func loadContacts() {
@@ -399,22 +361,22 @@ struct AddContactView: View {
     }
     
     private func importContacts() {
-        for selection in selectedContacts {
-            let cnContact = selection.cnContact
+        for identifier in selectedContactIds {
+            guard let cnContact = allContacts.first(where: { $0.identifier == identifier }) else { continue }
+            
             let name = "\(cnContact.givenName) \(cnContact.familyName)".trimmingCharacters(in: .whitespaces)
             let phoneNumber = cnContact.phoneNumbers.first?.value.stringValue
             let email = cnContact.emailAddresses.first?.value as String?
             let birthday = cnContact.birthday?.date
             let imageData: Data? = cnContact.imageData ?? cnContact.thumbnailImageData
             
-            // Get zodiac from selection or auto-detect from birthday
             let zodiacSign: ZodiacSign
-            if let selected = selection.zodiacSign {
+            if let selected = contactZodiacMap[identifier] {
                 zodiacSign = selected
             } else if let bday = birthday {
                 zodiacSign = ZodiacSign.from(birthday: bday)
             } else {
-                zodiacSign = .aries // Default
+                zodiacSign = .aries
             }
             
             let contact = Contact(
@@ -422,8 +384,6 @@ struct AddContactView: View {
                 phoneNumber: phoneNumber,
                 email: email,
                 zodiacSign: zodiacSign,
-                frequencyDays: selection.frequencyDays,
-                photosPersonLocalIdentifier: nil,
                 birthday: birthday,
                 profileImageData: imageData,
                 contactIdentifier: cnContact.identifier
@@ -436,47 +396,9 @@ struct AddContactView: View {
     }
 }
 
-// Helper struct
-struct ContactSelection: Identifiable {
-    let id = UUID()
-    let identifier: String
+// Contact row for selection
+struct ContactSelectionRow: View {
     let cnContact: CNContact
-    var frequencyDays: Int
-    var zodiacSign: ZodiacSign?
-}
-
-// Frequency button
-struct FrequencyButton: View {
-    let frequency: Int
-    let label: String
-    let isSelected: Bool
-    let count: Int
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            VStack(spacing: 4) {
-                Text(label)
-                    .font(.headline)
-                    .foregroundColor(isSelected ? .white : .primary)
-                
-                Text("\(count)")
-                    .font(.caption)
-                    .foregroundColor(isSelected ? .white.opacity(0.8) : .secondary)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 16)
-            .background(isSelected ? Color.indigo : Color(UIColor.secondarySystemBackground))
-            .cornerRadius(12)
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-// Contact row with zodiac picker
-struct ContactFrequencyRow: View {
-    let cnContact: CNContact
-    let selectedFrequency: Int
     let isSelected: Bool
     let zodiacSign: ZodiacSign?
     let onToggle: (Bool) -> Void
@@ -508,13 +430,13 @@ struct ContactFrequencyRow: View {
                 onToggle(!isSelected)
             } label: {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .foregroundColor(isSelected ? .indigo : .secondary)
+                    .foregroundColor(isSelected ? .purple : .white.opacity(0.4))
                     .font(.title3)
             }
             .buttonStyle(PlainButtonStyle())
             
             Text(contactName)
-                .foregroundColor(.primary)
+                .foregroundColor(.white)
             
             Spacer()
             
@@ -525,28 +447,33 @@ struct ContactFrequencyRow: View {
                     HStack(spacing: 4) {
                         if let sign = zodiacSign {
                             Text(sign.emoji)
+                            Text(sign.rawValue)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
                         } else {
                             Text("Set sign")
                                 .font(.caption)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.white.opacity(0.5))
                         }
                         Image(systemName: "chevron.down")
                             .font(.caption2)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.4))
                     }
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(Color(UIColor.tertiarySystemBackground))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.1))
                     .cornerRadius(8)
                 }
                 .buttonStyle(PlainButtonStyle())
             } else if hasBirthday {
-                Image(systemName: "gift.fill")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 4) {
+                    Image(systemName: "gift.fill")
+                        .font(.caption)
+                        .foregroundColor(.pink.opacity(0.7))
+                }
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
         .onTapGesture {
             onToggle(!isSelected)
@@ -587,7 +514,7 @@ struct ZodiacPickerView: View {
                             
                             if selectedSign == sign {
                                 Image(systemName: "checkmark")
-                                    .foregroundColor(.indigo)
+                                    .foregroundColor(.purple)
                             }
                         }
                     }
@@ -614,24 +541,25 @@ struct SearchBar: View {
     var body: some View {
         HStack {
             Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.4))
             
             TextField("Search contacts", text: $text)
                 .textFieldStyle(.plain)
+                .foregroundColor(.white)
             
             if !text.isEmpty {
                 Button {
                     text = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.4))
                 }
             }
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(UIColor.secondarySystemBackground))
-        .cornerRadius(10)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.1))
+        .cornerRadius(12)
     }
 }
 
@@ -640,5 +568,3 @@ extension DateComponents {
         Calendar.current.date(from: self)
     }
 }
-
-
