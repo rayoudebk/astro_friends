@@ -1246,19 +1246,56 @@ struct SearchView: View {
         isTextFieldFocused = false
         
         isTyping = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isTyping = false
-            let response = generateResponse(for: text)
-            let aiMessage = ChatMessage(content: response, isUser: false)
-            messages.append(aiMessage)
+        
+        // Use Gemini AI for dynamic responses
+        Task {
+            let response = await generateAIResponse(for: text)
+            await MainActor.run {
+                isTyping = false
+                let aiMessage = ChatMessage(content: response, isUser: false)
+                messages.append(aiMessage)
+            }
         }
     }
     
-    private func generateResponse(for query: String) -> String {
+    private func generateAIResponse(for query: String) async -> String {
+        // Build context with user's sign and current celestial info
+        let userSign = ZodiacSign(rawValue: savedUserSign) ?? .aries
+        let moonPhase = MoonPhase.current()
+        let moonSign = MoonSign.current()
+        
+        let prompt = """
+        You are a wise, warm, and poetic astrologer called "The Oracle of Stars". 
+        Answer the user's question about astrology in a helpful, mystical yet accessible way.
+        Keep responses concise (2-3 paragraphs max).
+        
+        Current celestial context:
+        - Moon Phase: \(moonPhase.rawValue)
+        - Moon Sign: \(moonSign.rawValue)
+        - User's Sun Sign: \(userSign.rawValue)
+        
+        User's question: \(query)
+        
+        Respond in a warm, insightful way that combines astrological wisdom with practical guidance.
+        """
+        
+        do {
+            let response = try await GeminiService.shared.askQuestion(prompt: prompt)
+            return response
+        } catch {
+            print("❌ Gemini Ask error: \(error)")
+            // Fallback to local response
+            return generateLocalResponse(for: query)
+        }
+    }
+    
+    private func generateLocalResponse(for query: String) -> String {
         let lowercased = query.lowercased()
+        let moonPhase = MoonPhase.current()
+        let moonSign = MoonSign.current()
         
         if lowercased.contains("horoscope") || lowercased.contains("today") {
-            return "Based on the current celestial alignments, today is a wonderful day for reflection and connection. The Moon in \(Horoscope.currentMoonSign.rawValue) brings \(Horoscope.currentMoonSign.emotionalFlavor) energy. \(Horoscope.currentMoonPhase.guidance)"
+            return "Based on the current celestial alignments, today is a wonderful day for reflection and connection. The Moon in \(moonSign.rawValue) brings \(moonSign.emotionalFlavor) energy. \(moonPhase.guidance)"
         } else if lowercased.contains("compatible") || lowercased.contains("compatibility") {
             return "Compatibility in astrology goes beyond just sun signs! For a complete picture, we look at Moon signs for emotional compatibility, Venus for love styles, and Mars for passion. Would you like to learn more about any specific pairing?"
         } else if lowercased.contains("mercury retrograde") {
@@ -1267,8 +1304,10 @@ struct SearchView: View {
             return "Your Rising sign (or Ascendant) represents how you appear to others and your outward personality. It's determined by the zodiac sign that was rising on the eastern horizon at your exact time of birth."
         } else if lowercased.contains("moon sign") {
             return "Your Moon sign represents your emotional nature, inner self, and subconscious patterns. It reveals how you process feelings, what makes you feel secure, and your instinctive reactions."
+        } else if lowercased.contains("love") || lowercased.contains("relationship") {
+            return "Love and relationships are deeply influenced by Venus and Mars in your chart. The current \(moonPhase.rawValue) is a beautiful time for \(moonPhase.emotionalTone) connections. Trust your heart's wisdom."
         } else {
-            return "That's a great question about astrology! The cosmos is always speaking to us through planetary movements and celestial patterns. Each aspect of your birth chart tells a unique part of your story. What specific aspect would you like to explore deeper?"
+            return "The stars whisper their secrets to those who listen. With the Moon in \(moonSign.rawValue) and the \(moonPhase.rawValue) illuminating our path, this is a powerful time for insight. What specifically draws your curiosity?"
         }
     }
 }

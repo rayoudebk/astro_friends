@@ -90,6 +90,13 @@ actor GeminiService {
         return try parseWeeklyCompatibilityResponse(response)
     }
     
+    // MARK: - Ask Question (Free-form chat)
+    /// Simple Q&A for the "Ask the Stars" chat feature
+    func askQuestion(prompt: String) async throws -> String {
+        let response = try await callGemini(prompt: prompt)
+        return response
+    }
+    
     // MARK: - Prompt Builders
     
     private func buildWeeklyOraclePrompt(
