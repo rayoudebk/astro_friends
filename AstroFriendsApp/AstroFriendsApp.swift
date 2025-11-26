@@ -172,18 +172,38 @@ struct HomeView: View {
         Array(contactCompatibilities.suffix(5).reversed())
     }
     
+    // MARK: - State for expandable sections
+    @State private var showFullReading = false
+    @State private var showFullOracle = false
+    
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
+                VStack(spacing: 16) {
+                    // Greeting Header
                     headerView
-                    weeklyReadingCard
                     
-                    // Tier 3: Your Personal Oracle
+                    // 🌙 Celestial Hero Card
+                    celestialHeroCard
+                    
+                    // ⚡ Quick Stats (Horizontal Scroll)
+                    quickStatsStrip
+                    
+                    // 📊 Energy Meters
+                    energyMetersCard
+                    
+                    // 📖 Weekly Reading (Collapsible)
+                    collapsibleReadingCard
+                    
+                    // ✨ Personal Oracle (if available)
                     if canAccessTier3 {
-                        personalOracleCard
+                        collapsibleOracleCard
                     }
                     
+                    // 🌟 Daily Affirmation
+                    dailyAffirmationCard
+                    
+                    // 💕 Top Compatibilities
                     if !contacts.isEmpty {
                         compatibilitySection
                     } else {
@@ -330,20 +350,22 @@ struct HomeView: View {
     
     
     private var headerView: some View {
-        VStack(spacing: 4) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("\(greeting)\(displayName.isEmpty ? "" : ", \(displayName)")")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                    
-                    Text(formattedDate)
-                        .font(.subheadline)
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                Spacer()
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("\(greeting)\(displayName.isEmpty ? "" : ", \(displayName)")")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                
+                Text(formattedDate)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.6))
             }
+            Spacer()
+            
+            // User's sign badge
+            Text(userSign.emoji)
+                .font(.largeTitle)
         }
         .padding(.top, 8)
     }
@@ -354,80 +376,436 @@ struct HomeView: View {
         return formatter.string(from: Date())
     }
     
-    private var weeklyReadingCard: some View {
-        Button {
-            showingHoroscopeDetail = true
-        } label: {
-            VStack(alignment: .leading, spacing: 12) {
+    // MARK: - 🌙 Celestial Hero Card
+    private var celestialHeroCard: some View {
+        VStack(spacing: 16) {
+            // Big Moon Phase Visual
+            ZStack {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [.purple.opacity(0.3), .indigo.opacity(0.1), .clear],
+                            center: .center,
+                            startRadius: 20,
+                            endRadius: 80
+                        )
+                    )
+                    .frame(width: 120, height: 120)
+                
+                Text(Horoscope.currentMoonPhase.emoji)
+                    .font(.system(size: 60))
+            }
+            
+            // Moon Phase Name
+            Text(Horoscope.currentMoonPhase.rawValue)
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+            
+            // Moon Sign
+            HStack(spacing: 4) {
+                Text("Moon in")
+                    .foregroundColor(.white.opacity(0.6))
+                Text(Horoscope.currentMoonSign.rawValue)
+                    .fontWeight(.medium)
+                    .foregroundColor(.purple)
+            }
+            .font(.subheadline)
+            
+            // Today's Vibe - One Word
+            Text(displayMood)
+                .font(.headline)
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 8)
+                .background(
+                    LinearGradient(
+                        colors: [.purple, .indigo],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+                .cornerRadius(20)
+        }
+        .padding(.vertical, 20)
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.15), Color.indigo.opacity(0.1)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .cornerRadius(24)
+    }
+    
+    // MARK: - ⚡ Quick Stats Strip
+    private var quickStatsStrip: some View {
+        let horoscope = Horoscope.getWeeklyHoroscope(for: userSign)
+        
+        return ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                // Lucky Number
+                QuickStatBadge(
+                    icon: "🔢",
+                    value: "\(weeklyHoroscope?.luckyNumber ?? horoscope.luckyNumber)",
+                    label: "Lucky #",
+                    color: .yellow
+                )
+                
+                // Lucky Color
+                QuickStatBadge(
+                    icon: "🎨",
+                    value: weeklyHoroscope?.luckyColor ?? horoscope.luckyColor,
+                    label: "Color",
+                    color: .purple
+                )
+                
+                // Best Match (from local Horoscope which has compatibility)
+                QuickStatBadge(
+                    icon: horoscope.compatibility.emoji,
+                    value: horoscope.compatibility.rawValue,
+                    label: "Match",
+                    color: .pink
+                )
+                
+                // Element
+                QuickStatBadge(
+                    icon: userSign.elementEmoji,
+                    value: userSign.element,
+                    label: "Element",
+                    color: .cyan
+                )
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+    
+    // MARK: - 📊 Energy Meters Card
+    private var energyMetersCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("This Week's Energy")
+                .font(.headline)
+                .foregroundColor(.white)
+            
+            // Love Meter
+            EnergyMeter(
+                icon: "💕",
+                label: "Love",
+                value: loveEnergy,
+                color: .pink
+            )
+            
+            // Career Meter
+            EnergyMeter(
+                icon: "💼",
+                label: "Career",
+                value: careerEnergy,
+                color: .orange
+            )
+            
+            // Wellness Meter
+            EnergyMeter(
+                icon: "🧘",
+                label: "Wellness",
+                value: wellnessEnergy,
+                color: .green
+            )
+        }
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(20)
+    }
+    
+    // Energy values based on horoscope mood
+    private var loveEnergy: Double {
+        let mood = displayMood.lowercased()
+        if mood.contains("romantic") || mood.contains("passionate") { return 0.9 }
+        if mood.contains("harmoni") || mood.contains("balanced") { return 0.75 }
+        if mood.contains("introspect") || mood.contains("reflective") { return 0.5 }
+        return 0.65
+    }
+    
+    private var careerEnergy: Double {
+        let mood = displayMood.lowercased()
+        if mood.contains("ambitious") || mood.contains("determined") { return 0.9 }
+        if mood.contains("creative") || mood.contains("inspired") { return 0.8 }
+        if mood.contains("reflective") || mood.contains("contemplative") { return 0.5 }
+        return 0.7
+    }
+    
+    private var wellnessEnergy: Double {
+        let mood = displayMood.lowercased()
+        if mood.contains("peaceful") || mood.contains("calm") || mood.contains("balanced") { return 0.9 }
+        if mood.contains("energetic") || mood.contains("vibrant") { return 0.85 }
+        if mood.contains("intense") || mood.contains("turbulent") { return 0.5 }
+        return 0.75
+    }
+    
+    // MARK: - 📖 Collapsible Reading Card
+    private var collapsibleReadingCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    showFullReading.toggle()
+                }
+            } label: {
                 HStack {
                     Text(userSign.emoji)
-                        .font(.title)
+                        .font(.title2)
                     
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Weekly Horoscope")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                        Text(userSign.dateRange)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
+                    Text("Weekly Reading")
+                        .font(.headline)
+                        .foregroundColor(.white)
                     
                     Spacer()
                     
-                    HStack(spacing: 4) {
-                        if isAIGenerated {
-                            Image(systemName: "sparkles")
-                                .font(.caption2)
-                                .foregroundColor(.yellow)
-                        }
-                        
-                        Text(displayMood)
-                            .font(.caption)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.purple.opacity(0.3))
-                            .foregroundColor(.purple)
-                            .cornerRadius(8)
-                        
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
-                    }
-                }
-                
-                Text(displayReading)
-                    .font(.subheadline)
-                    .foregroundColor(.white.opacity(0.8))
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
-                
-                // Moon info row
-                HStack {
-                    HStack(spacing: 4) {
-                        Text(Horoscope.currentMoonPhase.emoji)
-                        Text(Horoscope.currentMoonPhase.rawValue)
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.6))
-                    }
-                    
-                    Spacer()
-                    
-                    Text("Tap to read more")
+                    Image(systemName: showFullReading ? "chevron.up" : "chevron.down")
+                        .foregroundColor(.purple)
                         .font(.caption)
-                        .foregroundColor(.purple.opacity(0.8))
                 }
             }
-            .padding()
-            .background(
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.2), Color.indigo.opacity(0.1)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .cornerRadius(20)
+            .buttonStyle(.plain)
+            
+            // Preview or Full Text
+            Text(displayReading)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
+                .lineLimit(showFullReading ? nil : 2)
+                .multilineTextAlignment(.leading)
+            
+            if !showFullReading {
+                Button {
+                    withAnimation { showFullReading = true }
+                } label: {
+                    Text("Read more...")
+                        .font(.caption)
+                        .foregroundColor(.purple)
+                }
+            } else {
+                // Show detail button when expanded
+                Button {
+                    showingHoroscopeDetail = true
+                } label: {
+                    HStack {
+                        Text("See full horoscope")
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.caption)
+                    .foregroundColor(.purple)
+                }
+                .padding(.top, 4)
+            }
         }
-        .buttonStyle(.plain)
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(16)
+    }
+    
+    // MARK: - ✨ Collapsible Oracle Card
+    private var collapsibleOracleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation(.spring(response: 0.3)) {
+                    showFullOracle.toggle()
+                }
+            } label: {
+                HStack {
+                    Image(systemName: "sparkles")
+                        .font(.title2)
+                        .foregroundStyle(
+                            LinearGradient(colors: [.yellow, .orange], startPoint: .top, endPoint: .bottom)
+                        )
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Your Personal Oracle")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        if isLoadingPersonalOracle {
+                            Text("Consulting the stars...")
+                                .font(.caption)
+                                .foregroundColor(.yellow.opacity(0.7))
+                        }
+                    }
+                    
+                    Spacer()
+                    
+                    if isLoadingPersonalOracle {
+                        ProgressView()
+                            .tint(.yellow)
+                            .scaleEffect(0.7)
+                    } else {
+                        Image(systemName: showFullOracle ? "chevron.up" : "chevron.down")
+                            .foregroundColor(.yellow)
+                            .font(.caption)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            
+            if let oracle = personalOracle {
+                Text(oracle.weeklyReading)
+                    .font(.subheadline)
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(showFullOracle ? nil : 2)
+                
+                if showFullOracle {
+                    // Oracle Details
+                    HStack(spacing: 16) {
+                        if let lucky = oracle.luckyNumber {
+                            VStack(spacing: 2) {
+                                Text("\(lucky)")
+                                    .font(.title2)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.yellow)
+                                Text("Lucky")
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        
+                        if let color = oracle.luckyColor {
+                            VStack(spacing: 2) {
+                                Circle()
+                                    .fill(colorFromName(color))
+                                    .frame(width: 24, height: 24)
+                                Text(color)
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        
+                        if let mood = oracle.mood {
+                            VStack(spacing: 2) {
+                                Text(moodEmoji(for: mood))
+                                    .font(.title2)
+                                Text(mood)
+                                    .font(.caption2)
+                                    .foregroundColor(.white.opacity(0.5))
+                            }
+                        }
+                        
+                        Spacer()
+                    }
+                    .padding(.top, 8)
+                    
+                    if let insight = oracle.celestialInsight {
+                        Text("✨ \(insight)")
+                            .font(.caption)
+                            .italic()
+                            .foregroundColor(.yellow.opacity(0.8))
+                            .padding(.top, 4)
+                    }
+                }
+            } else if let error = personalOracleError {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red.opacity(0.8))
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                colors: [Color.yellow.opacity(0.1), Color.orange.opacity(0.05)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(16)
+    }
+    
+    // Helper functions for oracle card
+    private func colorFromName(_ name: String) -> Color {
+        switch name.lowercased() {
+        case "red": return .red
+        case "blue": return .blue
+        case "green": return .green
+        case "purple": return .purple
+        case "pink": return .pink
+        case "orange": return .orange
+        case "yellow": return .yellow
+        case "gold": return .yellow
+        case "silver": return .gray
+        case "white": return .white
+        default: return .purple
+        }
+    }
+    
+    private func moodEmoji(for mood: String) -> String {
+        switch mood.lowercased() {
+        case "romantic", "passionate": return "💕"
+        case "calm", "peaceful": return "🧘"
+        case "energetic", "vibrant": return "⚡"
+        case "reflective", "introspective": return "🔮"
+        case "creative", "inspired": return "🎨"
+        case "harmonious", "balanced": return "☯️"
+        default: return "✨"
+        }
+    }
+    
+    // MARK: - 🌟 Daily Affirmation Card
+    private var dailyAffirmationCard: some View {
+        VStack(spacing: 12) {
+            Text("✨ Today's Affirmation ✨")
+                .font(.caption)
+                .foregroundColor(.white.opacity(0.6))
+            
+            Text(dailyAffirmation)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .foregroundColor(.white)
+                .multilineTextAlignment(.center)
+                .italic()
+            
+            Button {
+                shareAffirmation()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "square.and.arrow.up")
+                    Text("Share")
+                }
+                .font(.caption)
+                .foregroundColor(.purple)
+            }
+        }
+        .padding()
+        .frame(maxWidth: .infinity)
+        .background(
+            LinearGradient(
+                colors: [Color.purple.opacity(0.1), Color.pink.opacity(0.1)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
+        .cornerRadius(16)
+    }
+    
+    private var dailyAffirmation: String {
+        let affirmations: [ZodiacSign: String] = [
+            .aries: "I embrace my courage and lead with passion.",
+            .taurus: "I am grounded, patient, and abundant.",
+            .gemini: "My curiosity opens doors to endless possibilities.",
+            .cancer: "I nurture myself and others with compassion.",
+            .leo: "I shine my authentic light for all to see.",
+            .virgo: "My attention to detail creates perfection.",
+            .libra: "I create harmony and beauty wherever I go.",
+            .scorpio: "My transformation leads to profound growth.",
+            .sagittarius: "My optimism attracts amazing adventures.",
+            .capricorn: "I build my dreams with discipline and patience.",
+            .aquarius: "My unique vision changes the world.",
+            .pisces: "I trust my intuition to guide my path."
+        ]
+        return affirmations[userSign] ?? "The stars align in my favor today."
+    }
+    
+    private func shareAffirmation() {
+        // Share functionality placeholder
+    }
+    
+    // MARK: - Old Weekly Reading Card (kept for reference, can be removed)
+    private var weeklyReadingCard: some View {
+        EmptyView() // Replaced by collapsibleReadingCard
     }
     
     // MARK: - Tier 3 Personal Oracle Card
@@ -1569,6 +1947,94 @@ struct FlowLayout: Layout {
             }
             
             height = y + rowHeight
+        }
+    }
+}
+
+// MARK: - Quick Stat Badge Component
+struct QuickStatBadge: View {
+    let icon: String
+    let value: String
+    let label: String
+    let color: Color
+    
+    var body: some View {
+        VStack(spacing: 6) {
+            Text(icon)
+                .font(.title2)
+            
+            Text(value)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(color)
+                .lineLimit(1)
+            
+            Text(label)
+                .font(.caption2)
+                .foregroundColor(.white.opacity(0.5))
+        }
+        .frame(width: 75, height: 85)
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(16)
+    }
+}
+
+// MARK: - Energy Meter Component
+struct EnergyMeter: View {
+    let icon: String
+    let label: String
+    let value: Double // 0.0 to 1.0
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(icon)
+                .font(.title3)
+            
+            Text(label)
+                .font(.subheadline)
+                .foregroundColor(.white.opacity(0.8))
+                .frame(width: 60, alignment: .leading)
+            
+            GeometryReader { geometry in
+                ZStack(alignment: .leading) {
+                    // Background track
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(Color.white.opacity(0.1))
+                        .frame(height: 8)
+                    
+                    // Filled portion
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(
+                            LinearGradient(
+                                colors: [color, color.opacity(0.6)],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: geometry.size.width * value, height: 8)
+                }
+            }
+            .frame(height: 8)
+            
+            Text("\(Int(value * 100))%")
+                .font(.caption)
+                .fontWeight(.medium)
+                .foregroundColor(color)
+                .frame(width: 40, alignment: .trailing)
+        }
+    }
+}
+
+// MARK: - ZodiacSign Element Emoji Extension
+extension ZodiacSign {
+    var elementEmoji: String {
+        switch element {
+        case "Fire": return "🔥"
+        case "Earth": return "🌍"
+        case "Air": return "💨"
+        case "Water": return "💧"
+        default: return "✨"
         }
     }
 }
