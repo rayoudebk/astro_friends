@@ -37,3 +37,4 @@ enum CheckInType: String, Codable, CaseIterable {
     }
 }
 
+
