@@ -15,6 +15,10 @@
 		34A92CDC2ED76A6500B62712 /* AstrologyAPIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */; };
 		34A92CDD2ED76A6500B62712 /* SupabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD72ED76A6500B62712 /* SupabaseService.swift */; };
 		34A92CDE2ED76A6500B62712 /* OracleManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34A92CD62ED76A6500B62712 /* OracleManager.swift */; };
+		8F93C5672ED9F92700AE9F69 /* AnalyticsManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93C5662ED9F92700AE9F69 /* AnalyticsManager.swift */; };
+		8F93C56B2ED9F93800AE9F69 /* NewContentManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93C5682ED9F93800AE9F69 /* NewContentManager.swift */; };
+		8F93C56C2ED9F93800AE9F69 /* NotificationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93C5692ED9F93800AE9F69 /* NotificationManager.swift */; };
+		8F93C56D2ED9F93800AE9F69 /* StreakManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F93C56A2ED9F93800AE9F69 /* StreakManager.swift */; };
 		8FB3E3F52ED607B200DDDCC5 /* AstralCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */; };
 		8FB3E3F72ED607C400DDDCC5 /* CompatibilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */; };
 		8FFD09AE2ED60DBF0007B015 /* NatalChart.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */; };
@@ -40,6 +44,10 @@
 		34A92CD52ED76A6500B62712 /* GeminiService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeminiService.swift; sourceTree = "<group>"; };
 		34A92CD62ED76A6500B62712 /* OracleManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OracleManager.swift; sourceTree = "<group>"; };
 		34A92CD72ED76A6500B62712 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		8F93C5662ED9F92700AE9F69 /* AnalyticsManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AnalyticsManager.swift; sourceTree = "<group>"; };
+		8F93C5682ED9F93800AE9F69 /* NewContentManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewContentManager.swift; sourceTree = "<group>"; };
+		8F93C5692ED9F93800AE9F69 /* NotificationManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
+		8F93C56A2ED9F93800AE9F69 /* StreakManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StreakManager.swift; sourceTree = "<group>"; };
 		8FB3E3F42ED607B200DDDCC5 /* AstralCompatibility.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AstralCompatibility.swift; sourceTree = "<group>"; };
 		8FB3E3F62ED607C400DDDCC5 /* CompatibilityView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CompatibilityView.swift; sourceTree = "<group>"; };
 		8FFD09AD2ED60DBF0007B015 /* NatalChart.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NatalChart.swift; sourceTree = "<group>"; };
@@ -81,6 +89,10 @@
 		34A92CD82ED76A6500B62712 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				8F93C5682ED9F93800AE9F69 /* NewContentManager.swift */,
+				8F93C5692ED9F93800AE9F69 /* NotificationManager.swift */,
+				8F93C56A2ED9F93800AE9F69 /* StreakManager.swift */,
+				8F93C5662ED9F92700AE9F69 /* AnalyticsManager.swift */,
 				3462BDCE2ED788C500D92CE5 /* CompatibilityEngine.swift */,
 				3462BDCF2ED788C500D92CE5 /* ContentService.swift */,
 				34A92CD42ED76A6500B62712 /* AstrologyAPIService.swift */,
@@ -230,8 +242,11 @@
 				3462BDD02ED788C500D92CE5 /* CompatibilityEngine.swift in Sources */,
 				3462BDD12ED788C500D92CE5 /* ContentService.swift in Sources */,
 				34A92CDA2ED76A6500B62712 /* GeminiService.swift in Sources */,
+				8F93C56C2ED9F93800AE9F69 /* NotificationManager.swift in Sources */,
 				34A92CDB2ED76A6500B62712 /* Secrets.swift in Sources */,
 				34A92CDC2ED76A6500B62712 /* AstrologyAPIService.swift in Sources */,
+				8F93C56B2ED9F93800AE9F69 /* NewContentManager.swift in Sources */,
+				8F93C5672ED9F92700AE9F69 /* AnalyticsManager.swift in Sources */,
 				34A92CDD2ED76A6500B62712 /* SupabaseService.swift in Sources */,
 				34A92CDE2ED76A6500B62712 /* OracleManager.swift in Sources */,
 				A10000000000000000000004 /* Contact.swift in Sources */,
@@ -244,6 +259,7 @@
 				A1000000000000000000000B /* SettingsView.swift in Sources */,
 				8FB3E3F52ED607B200DDDCC5 /* AstralCompatibility.swift in Sources */,
 				A1000000000000000000000C /* ContactRowView.swift in Sources */,
+				8F93C56D2ED9F93800AE9F69 /* StreakManager.swift in Sources */,
 				A1000000000000000000000D /* EmptyStateView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

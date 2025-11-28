@@ -1,5 +1,6 @@
 import Foundation
 import UserNotifications
+import UIKit
 
 // MARK: - Notification Manager
 /// Manages local and push notifications for the app
