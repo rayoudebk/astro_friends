@@ -34,6 +34,8 @@ struct OnboardingContainerView: View {
 // MARK: - Main Tab View
 struct MainTabView: View {
     @State private var selectedTab = 0
+    @StateObject private var streakManager = StreakManager.shared
+    @StateObject private var newContentManager = NewContentManager.shared
     
     var body: some View {
         TabView(selection: $selectedTab) {
@@ -67,6 +69,7 @@ struct MainTabView: View {
         }
         .tint(.purple)
         .onAppear {
+            // Configure tab bar appearance
             let appearance = UITabBarAppearance()
             appearance.configureWithOpaqueBackground()
             appearance.backgroundColor = UIColor(red: 0.05, green: 0.05, blue: 0.12, alpha: 1)
@@ -79,7 +82,32 @@ struct MainTabView: View {
             
             UITabBar.appearance().standardAppearance = appearance
             UITabBar.appearance().scrollEdgeAppearance = appearance
+            
+            // Sprint 1: Initialize retention systems
+            initializeRetentionSystems()
         }
+    }
+    
+    /// Initialize all retention-related managers on app launch
+    private func initializeRetentionSystems() {
+        // Register streak check-in
+        streakManager.registerCheckIn()
+        
+        // Refresh unseen content badges
+        newContentManager.refreshUnseenContent()
+        
+        // Request notification permission (soft, non-intrusive)
+        NotificationManager.shared.requestPermissionIfNeeded()
+        
+        // Track app open
+        AnalyticsManager.shared.trackEvent(AnalyticsEvent.appOpened, properties: [
+            "streak_days": streakManager.currentStreakDays
+        ])
+        
+        // Clean up old week data
+        newContentManager.cleanupOldData()
+        
+        print("[MainTabView] Retention systems initialized")
     }
 }
 
@@ -95,6 +123,10 @@ struct HomeView: View {
     @State private var showingUserSettings = false
     @State private var isReadingExpanded = false
     @State private var showingHoroscopeDetail = false
+    
+    // Sprint 1: Retention managers
+    @StateObject private var newContentManager = NewContentManager.shared
+    @StateObject private var streakManager = StreakManager.shared
     
     // Tier 2 weekly horoscope state
     @State private var weeklyHoroscope: WeeklyHoroscope?
@@ -542,21 +574,42 @@ struct HomeView: View {
         return 0.75
     }
     
+    // Sprint 1: Check if horoscope is new this week
+    private var isHoroscopeNew: Bool {
+        newContentManager.isHoroscopeNew(for: userSign)
+    }
+    
     // MARK: - 📖 Collapsible Reading Card
     private var collapsibleReadingCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Button {
                 withAnimation(.spring(response: 0.3)) {
                     showFullReading.toggle()
+                    
+                    // Sprint 1: Track analytics and mark as seen when expanded
+                    if showFullReading {
+                        AnalyticsManager.shared.trackEvent(AnalyticsEvent.weeklyHoroscopeViewed, properties: [
+                            "sign": userSign.rawValue,
+                            "was_new": isHoroscopeNew
+                        ])
+                        newContentManager.markHoroscopeSeen(for: userSign)
+                    }
                 }
             } label: {
                 HStack {
                     Text(userSign.emoji)
                         .font(.title2)
                     
-                    Text("Weekly Reading")
-                        .font(.headline)
-                        .foregroundColor(.white)
+                    HStack(spacing: 6) {
+                        Text("Weekly Reading")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                        
+                        // Sprint 1: "New ✨" badge
+                        if isHoroscopeNew {
+                            NewBadge()
+                        }
+                    }
                     
                     Spacer()
                     
@@ -577,6 +630,12 @@ struct HomeView: View {
             if !showFullReading {
                 Button {
                     withAnimation { showFullReading = true }
+                    // Sprint 1: Mark as seen when "Read more" is tapped
+                    AnalyticsManager.shared.trackEvent(AnalyticsEvent.weeklyHoroscopeViewed, properties: [
+                        "sign": userSign.rawValue,
+                        "was_new": isHoroscopeNew
+                    ])
+                    newContentManager.markHoroscopeSeen(for: userSign)
                 } label: {
                     Text("Read more...")
                         .font(.caption)
