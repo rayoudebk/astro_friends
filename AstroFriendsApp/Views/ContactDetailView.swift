@@ -136,6 +136,13 @@ struct ContactDetailView: View {
         .task {
             await loadContent()
         }
+        .onAppear {
+            // Sprint 1: Track contact view analytics
+            AnalyticsManager.shared.trackEvent(AnalyticsEvent.contactViewed, properties: [
+                "contact_sign": contact.zodiacSign.rawValue,
+                "completion_level": contact.astroCompletionLevel.rawValue
+            ])
+        }
     }
     
     // MARK: - Content Loading

@@ -12,6 +12,9 @@ struct CompatibilityView: View {
     @State private var showingUserBirthSettings = false
     @Environment(\.dismiss) private var dismiss
     
+    // Sprint 1: New content manager for "New ✨" badges
+    @StateObject private var newContentManager = NewContentManager.shared
+    
     // "This Week" compatibility state
     @State private var selectedTab: CompatibilityTab = .overall
     @State private var weeklyCompatibility: CompatibilityCache?
@@ -108,12 +111,28 @@ struct CompatibilityView: View {
     }
     
     // MARK: - Tab Selector
+    // Sprint 1: Check if "This Week" compatibility is new
+    private var isThisWeekNew: Bool {
+        newContentManager.isCompatibilityNew(userSign: userSign, contactSign: contact.zodiacSign, contactId: contact.id)
+    }
+    
     private var compatibilityTabSelector: some View {
         HStack(spacing: 0) {
             ForEach(CompatibilityTab.allCases, id: \.self) { tab in
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         selectedTab = tab
+                        
+                        // Sprint 1: Track analytics and mark as seen when "This Week" is selected
+                        if tab == .thisWeek {
+                            AnalyticsManager.shared.trackEvent(AnalyticsEvent.compatibilityWeeklyViewed, properties: [
+                                "user_sign": userSign.rawValue,
+                                "contact_sign": contact.zodiacSign.rawValue,
+                                "was_new": isThisWeekNew
+                            ])
+                            
+                            newContentManager.markCompatibilitySeen(userSign: userSign, contactSign: contact.zodiacSign, contactId: contact.id)
+                        }
                     }
                 } label: {
                     VStack(spacing: 4) {
@@ -124,8 +143,13 @@ struct CompatibilityView: View {
                             
                             if tab == .thisWeek {
                                 if canAccessThisWeek {
-                                    Image(systemName: "sparkles")
-                                        .font(.caption2)
+                                    // Sprint 1: Show "New ✨" badge if unseen
+                                    if isThisWeekNew {
+                                        NewBadge(text: "New", showSparkle: true)
+                                    } else {
+                                        Image(systemName: "sparkles")
+                                            .font(.caption2)
+                                    }
                                 } else {
                                     Image(systemName: "lock.fill")
                                         .font(.caption2)
